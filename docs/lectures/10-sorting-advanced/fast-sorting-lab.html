@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fast Sorting Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+/* Layout: one-screen classroom console, as in the other DSA27 labs. Code on the left;
+   the picture of the list on the right, with the variables and counters under it;
+   transport bar along the bottom. */
+:root {
+  --bg: #e9edf2;
+  --panel: #ffffff;
+  --panel-2: #f4f6f9;
+  --ink: #142033;
+  --muted: #5a6679;
+  --line: #d3d9e2;
+  --accent: #c76a00;        /* the running line, the pair being compared */
+  --accent-bg: #ffefcc;
+  --wait: #3456c7;          /* the smallest so far, the current value */
+  --wait-bg: #e6ecfc;
+  --done: #23803a;          /* in its final place */
+  --done-bg: #e2f4e6;
+  --prefix-bg: #dcf3f6;     /* sorted so far, not yet final (insertion sort) */
+  --hole: #c92a3a;
+  --hole-bg: #fde4e7;
+  --bar: #c9d3e3;
+  --kw: #8a2bb8; --str: #237a3a; --num: #b4520b; --com: #7b8798; --fn: #1d5fd0;
+  --shadow: 0 1px 2px rgba(20,32,51,.06), 0 4px 14px rgba(20,32,51,.06);
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-code: "JetBrains Mono", Consolas, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --panel: #171e28; --panel-2: #1d2532; --ink: #e4e9f1; --muted: #9aa6b8;
+    --line: #2b3545; --accent: #ffad47; --accent-bg: #3a2a12; --wait: #8ea6ff; --wait-bg: #1d2747;
+    --done: #6fd38a; --done-bg: #173322; --prefix-bg: #133338; --hole: #ff7b88; --hole-bg: #3a1a20;
+    --bar: #34405a; --kw: #d39bff; --str: #7fd492; --num: #ffb27a; --com: #7c879a; --fn: #8db6ff;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --panel: #171e28; --panel-2: #1d2532; --ink: #e4e9f1; --muted: #9aa6b8;
+  --line: #2b3545; --accent: #ffad47; --accent-bg: #3a2a12; --wait: #8ea6ff; --wait-bg: #1d2747;
+  --done: #6fd38a; --done-bg: #173322; --prefix-bg: #133338; --hole: #ff7b88; --hole-bg: #3a1a20;
+  --bar: #34405a; --kw: #d39bff; --str: #7fd492; --num: #ffb27a; --com: #7c879a; --fn: #8db6ff;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--f-body);
+  display: grid; grid-template-rows: auto 1fr auto; }
+button, select, input { font: inherit; color: inherit; }
+.mono, code, kbd, .code, .chip, .cell, .val, .idx, .vars table { font-family: var(--f-code); font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+kbd { font-size: 11px; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); }
+
+header.top { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.brand b { font-size: 18px; margin-right: 8px; }
+.brand span { color: var(--muted); font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 6px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--ink); color: var(--panel); }
+.inputs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inputs select, .inputs input[type=text] { padding: 6px 8px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--panel-2); }
+.inputs input[type=text] { width: 15em; font-family: var(--f-code); font-size: 13px; }
+.tools { margin-left: auto; display: flex; gap: 6px; }
+.btn { padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2);
+  cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.btn.on { background: var(--accent-bg); border-color: var(--accent); }
+.btn.bug.on { background: var(--hole-bg); border-color: var(--hole); }
+.btn:disabled { opacity: .45; cursor: default; }
+
+main { display: grid; gap: 12px; padding: 12px; min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "code pic" "code vars"; }
+.pane { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.pane-head { display: flex; justify-content: space-between; gap: 8px; padding: 8px 14px;
+  border-bottom: 1px solid var(--line); font-weight: 700; }
+.pane-head .meta { font-weight: 400; color: var(--muted); font-size: 13px; }
+.code-pane { grid-area: code; }
+.pic-pane { grid-area: pic; }
+.vars-pane { grid-area: vars; }
+
+.about { padding: 10px 14px 4px; }
+.about h1 { font-size: 17px; margin: 0 0 2px; }
+.about p { margin: 0; color: var(--muted); font-size: 14px; }
+.code { font: 13.5px/1.6 var(--f-code); padding: 8px 0; overflow: auto; flex: 0 0 auto; }
+.ln { display: grid; grid-template-columns: 3em 1fr; white-space: pre; padding-right: 12px; }
+.ln .no { color: var(--muted); text-align: right; padding-right: 1em; user-select: none; }
+.ln.run { background: var(--accent-bg); box-shadow: inset 3px 0 var(--accent); }
+.ln.mistake .tx { text-decoration: underline wavy var(--hole); text-underline-offset: 4px; }
+.k { color: var(--kw); } .n { color: var(--num); } .c { color: var(--com); font-style: italic; } .f { color: var(--fn); }
+.narr { margin: 6px 14px 14px; padding: 10px 12px; border-radius: 10px; background: var(--panel-2);
+  border: 1px solid var(--line); min-height: 4.2em; }
+.narr b { color: var(--accent); }
+.qcard { margin: 0 14px 14px; padding: 10px 12px; border: 2px solid var(--wait); border-radius: 10px; background: var(--wait-bg); }
+.qlabel { font-weight: 700; color: var(--wait); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.qtext { margin: 4px 0 8px; }
+.choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.choices .btn.right { background: var(--done-bg); border-color: var(--done); }
+.choices .btn.wrong { background: var(--hole-bg); border-color: var(--hole); }
+.qwhy { margin-top: 8px; font-size: 14px; }
+
+.picbox { flex: 1; min-height: 220px; padding: 12px 16px 8px; display: flex; flex-direction: column; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; align-items: center; }
+.chip { font-family: var(--f-code); font-size: 13px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); }
+.chip.cur { border-color: var(--wait); background: var(--wait-bg); color: var(--wait); font-weight: 700; }
+.verdict { font-weight: 700; padding: 3px 10px; border-radius: 8px; }
+.verdict.ok { color: var(--done); background: var(--done-bg); }
+.verdict.bad { color: var(--hole); background: var(--hole-bg); }
+.bars { height: clamp(170px, 34vh, 360px); display: flex; align-items: flex-end; gap: 6px; }
+.col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+.bar { width: 100%; border-radius: 6px 6px 2px 2px; background: var(--bar); border: 2px solid transparent;
+  transition: height .18s ease, background-color .18s; display: flex; align-items: flex-start; justify-content: center; }
+.val { font: 700 13px var(--f-code); margin-bottom: 3px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.idx { font: 11px var(--f-code); color: var(--muted); margin-top: 4px; }
+.card { width: 100%; height: 76px; border-radius: 8px; border: 2px solid var(--line); background: var(--panel-2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.card .key { font: 700 22px var(--f-code); }
+.card .nm { font-size: 12px; color: var(--muted); }
+.cmp .bar, .cmp .card { background: var(--accent-bg); border-color: var(--accent); }
+.min .bar, .min .card { background: var(--wait-bg); border-color: var(--wait); }
+.final .bar, .final .card { background: var(--done-bg); border-color: var(--done); }
+.prefix .bar, .prefix .card { background: var(--prefix-bg); }
+.hole .bar, .hole .card { background: var(--hole-bg); border: 2px dashed var(--hole); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 2px solid var(--line); }
+
+.rows { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; }
+.rows .lab { font: 13px var(--f-code); color: var(--muted); text-align: right; }
+.cells { display: flex; flex-wrap: wrap; gap: 4px; }
+.cell { min-width: 2.2em; padding: 4px 6px; text-align: center; font: 700 14px var(--f-code); border: 1px solid var(--line);
+  border-radius: 6px; background: var(--panel-2); position: relative; }
+.cell sub { position: absolute; top: -14px; left: 0; right: 0; font: 10px var(--f-code); color: var(--muted); }
+.cells.idxd { margin-top: 12px; row-gap: 18px; }
+.cell.cmp { background: var(--accent-bg); border-color: var(--accent); }
+.cell.final { background: var(--done-bg); border-color: var(--done); }
+
+.varwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.vars, .counters { padding: 8px 14px 12px; }
+.counters { border-left: 1px solid var(--line); }
+.vars table { border-collapse: collapse; font: 13.5px var(--f-code); }
+.vars td { padding: 2px 10px 2px 0; }
+.vars td:first-child { color: var(--muted); }
+.vars tr.chg td:last-child { color: var(--accent); font-weight: 700; }
+.ctr { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; font-size: 14px; }
+.ctr b { font: 700 16px var(--f-code); }
+.ctr.inv b { color: var(--wait); }
+.cfoot { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+footer.transport { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 16px;
+  background: var(--panel); border-top: 1px solid var(--line); }
+.group { display: flex; gap: 6px; flex-wrap: wrap; }
+.speed, .scrub { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.scrub { flex: 1; min-width: 180px; }
+.scrub input { flex: 1; }
+.pos { font: 12px var(--f-code); min-width: 7em; text-align: right; }
+#selftest { margin: 12px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; white-space: pre-wrap; }
+
+@media (max-width: 1050px) {
+  html, body { height: auto; }
+  body { display: block; }
+  main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "pic" "vars" "code"; }
+  .picbox { min-height: 260px; }
+  footer.transport { position: sticky; bottom: 0; z-index: 2; }
+}
+@media (max-width: 560px) {
+  .varwrap { grid-template-columns: 1fr; }
+  .counters { border-left: 0; border-top: 1px solid var(--line); }
+  .tools { margin-left: 0; }
+  .inputs { width: 100%; }
+  .inputs select, .inputs input[type=text] { flex: 1 1 100%; width: auto; min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+/* Last, so that no `font:` shorthand above resets it: students must see >= and != as typed. */
+.code, .code *, .chip, .cell, .val, .idx, .vars table, .ctr b, kbd, input[type=text] {
+  font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+/* Fast Sorting Lab additions: the call stack, the scratch row, the partition
+   regions, the heap tree. */
+.stackbox { padding: 8px 14px 12px; border-top: 1px solid var(--line); }
+.frames { display: flex; flex-direction: column; gap: 3px; font: 12.5px var(--f-code); max-height: 9.5em; overflow: auto; }
+.fr { padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+.fr.top { border-color: var(--accent); background: var(--accent-bg); font-weight: 700; }
+.col.out .bar, .col.out .card { opacity: .28; }
+.col.less .bar, .col.less .card { background: var(--prefix-bg); border-color: var(--line); }
+.col.geq .bar, .col.geq .card { background: var(--accent-bg); }
+.col.pivot .bar, .col.pivot .card { background: var(--pivot-bg); border-color: var(--pivot); }
+.col.left .bar, .col.left .card { background: var(--wait-bg); border-color: var(--wait); }
+.col.right .bar, .col.right .card { background: var(--run2-bg); border-color: var(--run2); }
+.col.taken .bar, .col.taken .card { opacity: .35; }
+.ptr { font: 700 12px var(--f-code); color: var(--accent); min-height: 16px; margin-top: 2px; }
+.scratchrow { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.scratchrow .lab { font: 12px var(--f-code); color: var(--muted); width: 4.6em; text-align: right; flex: none; }
+.scratchrow .cells { flex: 1; display: flex; gap: 6px; }
+.scratchrow .cell { flex: 1 1 0; min-width: 0; }
+.cell.k { border-color: var(--done); box-shadow: inset 0 -3px var(--done); }
+.cell.dim { opacity: .35; }
+svg.tree { width: 100%; height: 150px; flex: none; }
+svg.tree line { stroke: var(--line); stroke-width: 2; }
+svg.tree circle { fill: var(--panel-2); stroke: var(--muted); stroke-width: 1.5; }
+svg.tree .cmp circle { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 2.5; }
+svg.tree .final circle { fill: var(--done-bg); stroke: var(--done); }
+svg.tree .gone { opacity: .25; }
+svg.tree text { font: 700 13px var(--f-code); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+svg.tree text.ix { font: 10px var(--f-code); fill: var(--muted); }
+.pivotsel { display: none; }
+.pivotsel.show { display: inline-block; }
+:root { --pivot: #7a3fb5; --pivot-bg: #efe3fa; --run2: #0b7a8a; --run2-bg: #dcf3f6; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pivot: #c39bff; --pivot-bg: #2e2140; --run2: #5fd0de; --run2-bg: #133338; } }
+:root[data-theme="dark"] { --pivot: #c39bff; --pivot-bg: #2e2140; --run2: #5fd0de; --run2-bg: #133338; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><b>Fast Sorting Lab</b><span>DSA27 · Lecture 10</span></div>
+  <div class="seg" id="algoSeg" role="tablist" aria-label="Algorithm"></div>
+  <div class="inputs">
+    <select id="preset" aria-label="Input"></select>
+    <select id="pivot" class="pivotsel" aria-label="Pivot rule" title="Pivot rule">
+      <option value="last">pivot: last (the slide code)</option>
+      <option value="first">pivot: first</option>
+      <option value="median3">pivot: median of three</option>
+      <option value="random">pivot: random</option>
+    </select>
+    <input type="text" id="custom" placeholder="your list: 7, 2, 9, 4" aria-label="Your own list">
+    <button class="btn" id="runBtn" title="Run on your own list (Enter)">Run</button>
+  </div>
+  <div class="tools">
+    <button class="btn bug" id="bugBtn" title="Run the common mistake (M)">Common mistake <kbd>M</kbd></button>
+    <button class="btn" id="themeBtn" title="Switch light / dark">Theme</button>
+    <button class="btn" id="fsBtn" title="Full screen (F)">Full screen</button>
+  </div>
+</header>
+
+<main>
+  <section class="pane code-pane">
+    <div class="pane-head"><span>Code</span><span class="meta" id="lineInfo"></span></div>
+    <div class="about"><h1 id="title"></h1><p id="blurb"></p></div>
+    <div class="code" id="code"></div>
+    <div class="narr" id="narr" aria-live="polite"></div>
+    <div id="qbox"></div>
+  </section>
+
+  <section class="pane pic-pane">
+    <div class="pane-head"><span id="picTitle">The list a</span><span class="meta" id="picMeta"></span></div>
+    <div class="picbox">
+      <div class="chips" id="chips"></div>
+      <div id="pic" style="flex:1;display:flex;flex-direction:column;min-height:0"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+
+  <section class="pane vars-pane">
+    <div class="varwrap">
+      <div class="vars"><div class="pane-head" style="padding:0 0 6px;border:0">Variables</div><table id="vars"></table></div>
+      <div class="counters"><div class="pane-head" style="padding:0 0 6px;border:0">Counters</div><div id="ctrs"></div></div>
+    </div>
+    <div class="stackbox"><div class="pane-head" style="padding:0 0 6px;border:0"><span>Call stack</span><span class="meta">newest on top</span></div><div class="frames" id="stack"></div></div>
+  </section>
+</main>
+
+<footer class="transport">
+  <div class="group">
+    <button class="btn" id="bRestart" title="Back to the start (R)">Restart <kbd>R</kbd></button>
+    <button class="btn" id="bBack" title="One step back (Left arrow)">Back <kbd>&larr;</kbd></button>
+    <button class="btn primary" id="bStep" title="One step (Right arrow or Space)">Step <kbd>&rarr;</kbd></button>
+    <button class="btn" id="bPlay" title="Play / pause (P)">Play <kbd>P</kbd></button>
+  </div>
+  <div class="speed"><label for="speed">Speed</label><input type="range" id="speed" min="1" max="10" value="5"></div>
+  <div class="scrub"><input type="range" id="scrub" min="0" max="0" value="0" aria-label="Jump to step"><span class="pos" id="pos"></span></div>
+  <button class="btn" id="bQuiz" title="Ask before each decision (Q)">What happens next? off <kbd>Q</kbd></button>
+</footer>
+
+<pre id="selftest" hidden></pre>
+
+<script>
+/* =====================================================================
+   ENGINE. Each sort is a JavaScript mirror of the Python on screen, line
+   for line. It runs once on the input, and the tracer keeps a snapshot at
+   every step, so Back and the scrubber are only an index into that list.
+   The recursion is real JavaScript recursion; the tracer keeps the Python
+   call stack beside it.
+   ===================================================================== */
+
+const $ = id => document.getElementById(id);
+const LIMIT = 60;                    // our "recursion limit", so a runaway call stops quickly
+class RecursionLimit extends Error {}
+
+// ---- the code on screen: [label, text] ----------------------------------------
+function codeFor(algo, bug, pivot) {
+  if (algo === 'merge') return [
+    ['def',   'def merge_sort(a):'],
+    ['scr',   '    scratch = [None] * len(a)           # one scratch list for every merge'],
+    ['call',  '    sort(a, 0, len(a), scratch)'],
+    ['ret',   '    return a'],
+    ['_1',    ''],
+    ['sdef',  'def sort(a, lo, hi, scratch):           # sort a[lo:hi]'],
+    ['base',  '    if hi - lo <= 1:                    # 0 or 1 values: already sorted'],
+    ['bret',  '        return'],
+    ['mid',   '    mid = (lo + hi) // 2'],
+    ['left',  '    sort(a, lo, mid, scratch)           # left half'],
+    ['right', '    sort(a, mid, hi, scratch)           # right half'],
+    ['merge', '    _merge(a, lo, mid, hi, scratch)     # combine'],
+    ['_2',    ''],
+    ['mdef',  'def _merge(a, lo, mid, hi, scratch):'],
+    ['minit', '    i, j, k = lo, mid, lo'],
+    ['mwh',   '    while i < mid and j < hi:'],
+    ['mif',   bug ? '        if a[i] < a[j]:                 # MISTAKE: < instead of <=' : '        if a[i] <= a[j]:                # <= : on a tie, take the LEFT one'],
+    ['mtl',   '            scratch[k] = a[i]; i += 1'],
+    ['melse', '        else:'],
+    ['mtr',   '            scratch[k] = a[j]; j += 1'],
+    ['mk',    '        k += 1'],
+    ['mrl',   '    while i < mid:  scratch[k] = a[i]; i += 1; k += 1'],
+    ['mrr',   '    while j < hi:   scratch[k] = a[j]; j += 1; k += 1'],
+    ['mback', '    for k in range(lo, hi):  a[k] = scratch[k]'],
+  ];
+  if (algo === 'quick') {
+    const rule = { first: 'lo', median3: 'median of a[lo], a[mid], a[hi]', random: 'random index in lo..hi' }[pivot];
+    const lines = [
+      ['def',   'def quick_sort(a):'],
+      ['call',  '    sort(a, 0, len(a) - 1)'],
+      ['ret',   '    return a'],
+      ['_1',    ''],
+      ['sdef',  'def sort(a, lo, hi):                   # sort a[lo..hi]'],
+      ['base',  '    if lo >= hi:                       # 0 or 1 values: already sorted'],
+      ['bret',  '        return'],
+    ];
+    if (pivot !== 'last') lines.push(
+      ['choose', `    m = choose_pivot(a, lo, hi)         # ${rule}`],
+      ['pswap',  '    a[m], a[hi] = a[hi], a[m]          # the chosen pivot goes to a[hi]']);
+    lines.push(
+      ['part',  '    p = _partition(a, lo, hi)          # the pivot lands at p, for good'],
+      ['left',  bug ? '    sort(a, lo, p)                     # MISTAKE: p, not p - 1' : '    sort(a, lo, p - 1)                 # the smaller values'],
+      ['right', '    sort(a, p + 1, hi)                 # the larger values'],
+      ['_2',    ''],
+      ['pdef',  'def _partition(a, lo, hi):'],
+      ['pv',    '    pivot = a[hi]'],
+      ['b0',    '    boundary = lo'],
+      ['pfor',  '    for j in range(lo, hi):'],
+      ['pif',   '        if a[j] < pivot:'],
+      ['pswj',  '            a[boundary], a[j] = a[j], a[boundary]; boundary += 1'],
+      ['plast', '    a[boundary], a[hi] = a[hi], a[boundary]   # the pivot to its final place'],
+      ['pret',  '    return boundary']);
+    return lines;
+  }
+  return [
+    ['def',   'def heap_sort(a):'],
+    ['n',     '    n = len(a)'],
+    ['build', bug ? '    for i in range(0, n // 2):              # MISTAKE: root first' : '    for i in range(n // 2 - 1, -1, -1):    # 1. build a max-heap'],
+    ['bsift', '        _sift_down(a, i, n)'],
+    ['loop',  '    for end in range(n - 1, 0, -1):        # 2. the max goes to the back'],
+    ['swend', '        a[0], a[end] = a[end], a[0]'],
+    ['rsift', '        _sift_down(a, 0, end)              #    repair the heap in a[0:end]'],
+    ['ret',   '    return a'],
+    ['_1',    ''],
+    ['sdef',  'def _sift_down(a, index, size):        # the heap is a[0:size]'],
+    ['while', '    while True:'],
+    ['lg',    '        largest = index'],
+    ['lr',    '        left, right = 2 * index + 1, 2 * index + 2'],
+    ['ifl',   '        if left < size and a[left] > a[largest]:   largest = left'],
+    ['ifr',   '        if right < size and a[right] > a[largest]: largest = right'],
+    ['done',  '        if largest == index:'],
+    ['sret',  '            return'],
+    ['sswap', '        a[index], a[largest] = a[largest], a[index]'],
+    ['down',  '        index = largest'],
+  ];
+}
+
+const ALGOS = {
+  merge: { name: 'Merge sort', short: 'Merge', moves: 'Writes',
+    blurb: 'Split in the middle until each piece has one value; merge sorted pieces on the way back up.',
+    bug: 'The merge uses < instead of <=, so on a tie it takes the RIGHT value. It still sorts, but equal keys change order: try the cards.' },
+  quick: { name: 'Quicksort', short: 'Quick', moves: 'Swaps',
+    blurb: 'Pick a pivot; put the smaller values left of it and the rest right of it. Then sort the two sides.',
+    bug: 'The left call includes the pivot: sort(a, lo, p). The pivot is the largest value of that range, so the range partitions into itself again, forever.' },
+  heap: { name: 'Heap sort', short: 'Heap', moves: 'Swaps',
+    blurb: 'Build a max-heap so that the maximum is at a[0]; swap it to the back, repair the heap, repeat.',
+    bug: 'The heap is built from the root down. When the root is sifted its subtrees are not heaps yet, so the maximum can stay buried.' },
+};
+
+// ---- inputs -------------------------------------------------------------------------
+const CARDS = [[3, 'a'], [1, 'b'], [3, 'c'], [2, 'd'], [1, 'e'], [2, 'f']];
+const PRESETS = [
+  { id: 'L',      label: "L — the lecture's list", values: [7, 2, 9, 4, 1, 8, 3, 6] },
+  { id: 'sorted', label: 'Sorted', values: [1, 2, 3, 4, 5, 6, 7, 8] },
+  { id: 'sorted16', label: 'Sorted, 16 values (quicksort’s worst case)', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] },
+  { id: 'rev',    label: 'Reversed', values: [8, 7, 6, 5, 4, 3, 2, 1] },
+  { id: 'dup',    label: 'All equal', values: [5, 5, 5, 5, 5, 5, 5, 5] },
+  { id: 'rand',   label: 'Random (new each time)', values: null },
+  { id: 'cards',  label: 'Cards: stable or not?', cards: CARDS },
+];
+function itemsFromValues(vs) { return vs.map((v, i) => ({ k: v, t: String(v), id: i })); }
+function itemsFromCards(cs) { return cs.map(([v, tag], i) => ({ k: v, t: v + tag, tag, id: i })); }
+function randomValues(n) { const out = []; for (let i = 0; i < n; i++) out.push(1 + Math.floor(Math.random() * 12)); return out; }
+const show = x => (x === null || x === undefined) ? '' : x.t;
+
+// a small seeded generator, so a "random" run is the same every time
+function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+// ---- tracer ---------------------------------------------------------------------------
+class Tracer {
+  constructor(algo, items, bug, pivot) {
+    Object.assign(this, { algo, bug, pivot });
+    this.code = codeFor(algo, bug, pivot);
+    this.a = items.slice(); this.scratch = null;
+    this.vars = {}; this.changed = new Set();
+    this.cnt = { cmp: 0, mov: 0, depth: 0 };
+    this.hi = {}; this.stack = []; this.final = new Set();
+    this.frames = [];
+  }
+  line(label) { const i = this.code.findIndex(([l]) => l === label); if (i < 0) throw new Error('no line ' + label); return i; }
+  set(o) { for (const k in o) { this.vars[k] = o[k]; this.changed.add(k); } }
+  push(name) { this.stack.push(name); this.cnt.depth = Math.max(this.cnt.depth, this.stack.length); if (this.stack.length > LIMIT) throw new RecursionLimit(); }
+  pop() { this.stack.pop(); }
+  snap(label, msg, extra) {
+    this.frames.push({ line: this.line(label), msg, a: this.a.slice(), scratch: this.scratch ? this.scratch.slice() : null,
+      vars: { ...this.vars }, changed: [...this.changed], cnt: { ...this.cnt }, hi: { ...this.hi },
+      stack: this.stack.slice(), final: [...this.final], ...(extra || {}) });
+    this.changed = new Set();
+    return this.frames[this.frames.length - 1];
+  }
+}
+
+// ---- merge sort ------------------------------------------------------------------------
+function runMerge(T) {
+  const a = T.a, n = a.length;
+  T.push('merge_sort(a)');
+  T.scratch = new Array(n).fill(null);
+  T.snap('scr', `<b>scratch</b>: ${n} empty slots, made once and shared by every merge.`);
+  T.snap('call', `Sort the whole list: <b>sort(a, 0, ${n})</b>.`);
+  sortM(T, 0, n);
+  T.hi = { all: true }; T.vars = {};
+  T.snap('ret', `Done: <b>${T.cnt.cmp} comparisons</b>, ${T.cnt.mov} writes, call stack at most <b>${T.cnt.depth}</b> deep.`, { end: true });
+}
+function sortM(T, lo, hi) {
+  const a = T.a;
+  T.push(`sort(a, ${lo}, ${hi})`);
+  T.set({ lo, hi }); T.hi = { range: [lo, hi] };
+  T.snap('sdef', `<b>sort(a, ${lo}, ${hi})</b>: sort a[${lo}:${hi}], ${hi - lo} value${hi - lo === 1 ? '' : 's'}.`);
+  if (hi - lo <= 1) {
+    T.snap('bret', `${hi - lo} value${hi - lo === 1 ? '' : 's'}: <b>already sorted</b> — the base case.`);
+    T.pop(); return;
+  }
+  const mid = Math.floor((lo + hi) / 2);
+  T.set({ mid }); T.snap('mid', `<b>mid = ${mid}</b>: the halves are a[${lo}:${mid}] and a[${mid}:${hi}]. No comparison: dividing is free.`);
+  T.snap('left', `Sort the left half first: <b>sort(a, ${lo}, ${mid})</b>.`);
+  sortM(T, lo, mid);
+  T.set({ lo, hi, mid }); T.hi = { range: [lo, hi] };
+  T.snap('right', `Back in sort(a, ${lo}, ${hi}). Now the right half: <b>sort(a, ${mid}, ${hi})</b>.`);
+  sortM(T, mid, hi);
+  T.set({ lo, hi, mid }); T.hi = { range: [lo, hi] };
+  T.snap('merge', `Both halves are sorted. <b>Merge</b> them.`);
+  mergeM(T, lo, mid, hi);
+  T.pop();
+}
+function mergeM(T, lo, mid, hi) {
+  const a = T.a, s = T.scratch;
+  T.push(`_merge(a, ${lo}, ${mid}, ${hi})`);
+  for (let x = lo; x < hi; x++) s[x] = null;
+  let i = lo, j = mid, k = lo;
+  const hl = () => { T.hi = { merge: [lo, mid, hi], i, j, k }; };
+  T.set({ i, j, k }); hl();
+  T.snap('minit', `<b>i = ${i}</b> walks the left run, <b>j = ${j}</b> the right run, <b>k = ${k}</b> the next free slot of scratch.`);
+  while (i < mid && j < hi) {
+    T.cnt.cmp++;
+    const takeLeft = T.bug ? a[i].k < a[j].k : a[i].k <= a[j].k;
+    hl();
+    T.snap('mif', `Compare the fronts: <b>${show(a[i])} ${T.bug ? '&lt;' : '&lt;='} ${show(a[j])}</b>? ${takeLeft ? 'Yes: take the left one.' : 'No: take the right one.'}`,
+      { q: { text: `Which value goes to scratch[${k}] next?`, choices: [`a[i] = ${show(a[i])} (left)`, `a[j] = ${show(a[j])} (right)`], answer: takeLeft ? 0 : 1,
+        why: takeLeft ? `${show(a[i])} ${T.bug ? '<' : '<='} ${show(a[j])}${a[i].k === a[j].k && !T.bug ? ' — a tie, and <= takes the LEFT one: that keeps the sort stable' : ''}.`
+                      : `${show(a[j])} is smaller${a[i].k === a[j].k ? ' — no: it is a tie, and < takes the RIGHT one. That is the mistake' : ''}.` } });
+    if (takeLeft) { s[k] = a[i]; i++; T.cnt.mov++; T.set({ i }); hl(); T.snap('mtl', `<b>scratch[${k}] = ${show(s[k])}</b>; i moves on.`); }
+    else { s[k] = a[j]; j++; T.cnt.mov++; T.set({ j }); hl(); T.snap('mtr', `<b>scratch[${k}] = ${show(s[k])}</b>; j moves on.`); }
+    k++; T.set({ k }); hl();
+  }
+  while (i < mid) { s[k] = a[i]; i++; k++; T.cnt.mov++; T.set({ i, k }); hl(); T.snap('mrl', `The right run is empty: copy <b>${show(s[k - 1])}</b> from the left run. No comparison needed.`); }
+  while (j < hi) { s[k] = a[j]; j++; k++; T.cnt.mov++; T.set({ j, k }); hl(); T.snap('mrr', `The left run is empty: copy <b>${show(s[k - 1])}</b> from the right run. No comparison needed.`); }
+  for (let x = lo; x < hi; x++) { a[x] = s[x]; T.cnt.mov++; }
+  T.hi = { range: [lo, hi], merged: true };
+  T.snap('mback', `<b>Copy back</b>: a[${lo}:${hi}] is now one sorted run.`);
+  T.pop();
+}
+
+// ---- quicksort -------------------------------------------------------------------------
+function runQuick(T) {
+  const a = T.a, n = a.length;
+  T.rand = rng(27);
+  T.push('quick_sort(a)');
+  T.snap('call', `Sort the whole list: <b>sort(a, 0, ${n - 1})</b>.`);
+  sortQ(T, 0, n - 1);
+  T.hi = { all: true }; T.vars = {};
+  T.snap('ret', `Done: <b>${T.cnt.cmp} comparisons</b>, ${T.cnt.mov} swaps, call stack at most <b>${T.cnt.depth}</b> deep.`, { end: true });
+}
+function choosePivot(T, lo, hi) {
+  const a = T.a;
+  if (T.pivot === 'first') return lo;
+  if (T.pivot === 'random') return lo + Math.floor(T.rand() * (hi - lo + 1));
+  const mid = Math.floor((lo + hi) / 2), f = a[lo].k, m = a[mid].k, l = a[hi].k;
+  if ((f <= m && m <= l) || (l <= m && m <= f)) return mid;
+  if ((m <= f && f <= l) || (l <= f && f <= m)) return lo;
+  return hi;
+}
+function sortQ(T, lo, hi) {
+  const a = T.a;
+  T.push(`sort(a, ${lo}, ${hi})`);
+  T.set({ lo, hi }); T.hi = { range: [lo, hi + 1] };
+  T.snap('sdef', `<b>sort(a, ${lo}, ${hi})</b>: sort a[${lo}..${hi}].`);
+  if (lo >= hi) { T.snap('bret', `${hi - lo + 1 > 0 ? 'One value' : 'No values'}: <b>already sorted</b> — the base case.`); T.pop(); return; }
+  if (T.pivot !== 'last') {
+    const m = choosePivot(T, lo, hi);
+    T.set({ m }); T.hi = { range: [lo, hi + 1], cmp: [m] };
+    T.snap('choose', `The ${T.pivot === 'median3' ? 'median of three' : T.pivot} rule picks <b>a[${m}] = ${show(a[m])}</b> as the pivot.`);
+    if (m !== hi) { [a[m], a[hi]] = [a[hi], a[m]]; T.cnt.mov++; }
+    T.hi = { range: [lo, hi + 1], pivot: hi };
+    T.snap('pswap', m !== hi ? `Swap it to <b>a[${hi}]</b>, so that _partition finds it at the end.` : 'It is already at a[hi].');
+  }
+  T.snap('part', `<b>Partition</b> a[${lo}..${hi}] around a[${hi}] = ${show(a[hi])}.`);
+  const p = partitionQ(T, lo, hi);
+  T.final.add(p);
+  T.set({ lo, hi, p }); T.hi = { range: [lo, hi + 1] };
+  T.snap(T.pivot === 'last' ? 'part' : 'part', `The pivot ${show(a[p])} is at <b>p = ${p}</b> for good. Smaller values are left of it, the rest right of it.`);
+  const L = T.bug ? p : p - 1;
+  T.snap('left', `Sort the left part: <b>sort(a, ${lo}, ${L})</b>${T.bug ? ' — and it still contains the pivot' : ''}.`);
+  sortQ(T, lo, L);
+  T.set({ lo, hi, p }); T.hi = { range: [lo, hi + 1] };
+  T.snap('right', `Back in sort(a, ${lo}, ${hi}). Now the right part: <b>sort(a, ${p + 1}, ${hi})</b>.`);
+  sortQ(T, p + 1, hi);
+  T.pop();
+}
+function partitionQ(T, lo, hi) {
+  const a = T.a;
+  T.push(`_partition(a, ${lo}, ${hi})`);
+  const pivot = a[hi]; T.set({ pivot: show(pivot) });
+  let boundary = lo;
+  const hl = (j, extra) => { T.hi = { range: [lo, hi + 1], part: [lo, boundary, j, hi], ...(extra || {}) }; };
+  hl(lo); T.snap('pv', `<b>pivot = ${show(pivot)}</b>, the last value of the range.`);
+  T.set({ boundary }); T.snap('b0', `<b>boundary = ${lo}</b>: the green part (&lt; pivot) is still empty.`);
+  for (let j = lo; j < hi; j++) {
+    T.set({ j }); hl(j, { cmp: [j] });
+    T.snap('pfor', `<b>j = ${j}</b>: look at a[${j}] = ${show(a[j])}.`);
+    T.cnt.cmp++;
+    const less = a[j].k < pivot.k;
+    T.snap('pif', `Is <b>${show(a[j])} &lt; ${show(pivot)}</b>? ${less ? 'Yes.' : 'No: it joins the amber part (≥ pivot). Nothing moves.'}`,
+      { q: { text: `Is a[${j}] = ${show(a[j])} smaller than the pivot ${show(pivot)}?`, choices: ['Yes: swap it into the green part', 'No: leave it'], answer: less ? 0 : 1,
+        why: less ? `${show(a[j])} < ${show(pivot)}: swap it with a[boundary] = ${show(a[boundary])}, and boundary moves right.` : `${show(a[j])} ≥ ${show(pivot)}: the amber part just grows by one.` } });
+    if (less) {
+      [a[boundary], a[j]] = [a[j], a[boundary]]; boundary++; T.cnt.mov++;
+      T.set({ boundary }); hl(j + 1);
+      T.snap('pswj', `Swap a[${boundary - 1}] and a[${j}]: <b>${show(a[boundary - 1])}</b> joins the green part. boundary = ${boundary}.`);
+    }
+  }
+  [a[boundary], a[hi]] = [a[hi], a[boundary]]; T.cnt.mov++;
+  hl(hi, { placed: boundary });
+  T.snap('plast', `<b>The last swap</b> puts the pivot ${show(a[boundary])} between the two parts, at index ${boundary}.`);
+  T.snap('pret', `<b>return ${boundary}</b>.`);
+  T.pop();
+  return boundary;
+}
+
+// ---- heap sort ---------------------------------------------------------------------------
+function runHeap(T) {
+  const a = T.a, n = a.length;
+  T.push('heap_sort(a)');
+  T.set({ n }); T.hi = { size: n };
+  T.snap('n', `<b>n = ${n}</b>. Read the list as a tree: the children of a[i] are a[2i + 1] and a[2i + 2].`);
+  const order = [];
+  if (T.bug) for (let i = 0; i < Math.floor(n / 2); i++) order.push(i);
+  else for (let i = Math.floor(n / 2) - 1; i >= 0; i--) order.push(i);
+  for (const i of order) {
+    T.set({ i }); T.hi = { size: n, cmp: [i] };
+    T.snap('build', `Build-heap: sift down the parent <b>a[${i}] = ${show(a[i])}</b>${T.bug ? ' — before its subtrees are heaps' : '. Its subtrees are already heaps'}.`);
+    T.snap('bsift', `<b>_sift_down(a, ${i}, ${n})</b>.`);
+    sift(T, i, n);
+    T.set({ i });
+  }
+  T.hi = { size: n };
+  T.snap('loop', `${isHeap(a, n) ? 'The list is now a <b>max-heap</b>: every parent ≥ its children, and the maximum is at a[0].' : '<b>This is NOT a heap</b>: some parent is smaller than a child.'}`);
+  for (let end = n - 1; end > 0; end--) {
+    T.set({ end }); T.hi = { size: end + 1, cmp: [0, end] };
+    T.snap('loop', `<b>end = ${end}</b>: the heap is a[0..${end}]; slots after ${end} are final.`);
+    [a[0], a[end]] = [a[end], a[0]]; T.cnt.mov++; T.final.add(end);
+    T.hi = { size: end };
+    T.snap('swend', `Swap the root to the back: <b>${show(a[end])}</b> is in its final place.`);
+    T.snap('rsift', `Only the new root ${show(a[0])} may break the heap: <b>_sift_down(a, 0, ${end})</b>.`);
+    sift(T, 0, end);
+  }
+  T.final.add(0); T.hi = { all: true }; T.vars = {};
+  T.snap('ret', `Done: <b>${T.cnt.cmp} comparisons, ${T.cnt.mov} swaps</b>.`, { end: true });
+}
+function isHeap(a, size) { for (let i = 1; i < size; i++) if (a[Math.floor((i - 1) / 2)].k < a[i].k) return false; return true; }
+function sift(T, index, size) {
+  const a = T.a, outer = T.vars.i;
+  T.push(`_sift_down(a, ${index}, ${size})`);
+  for (;;) {
+    let largest = index;
+    const left = 2 * index + 1, right = 2 * index + 2;
+    T.set({ index, size, largest }); T.hi = { size, cmp: [index] };
+    T.snap('lg', `<b>largest = ${index}</b>: assume a[${index}] = ${show(a[index])} is the largest of the three.`);
+    T.set({ left, right });
+    const kids = [left, right].filter(c => c < size);
+    T.hi = { size, cmp: [index, ...kids] };
+    let want = index;
+    for (const c of kids) if (a[c].k > a[want].k) want = c;
+    T.snap('lr', kids.length ? `The children of ${index} are ${kids.map(c => `a[${c}] = ${show(a[c])}`).join(' and ')}.` : `a[${index}] has no children inside the heap.`,
+      kids.length ? { q: { text: `a[${index}] = ${show(a[index])}. Does it move down? With which child?`,
+        choices: ['It stays', ...kids.map(c => `Swap with a[${c}] = ${show(a[c])}`)], answer: want === index ? 0 : 1 + kids.indexOf(want),
+        why: want === index ? `${show(a[index])} is at least as large as its children: the heap is repaired.` : `Swap with the LARGER child, ${show(a[want])}, so that the new parent is at least as large as both children.` } } : undefined);
+    if (left < size) { T.cnt.cmp++; if (a[left].k > a[largest].k) largest = left; T.set({ largest }); T.snap('ifl', `Compare the left child: largest = <b>${largest}</b>.`); }
+    if (right < size) { T.cnt.cmp++; if (a[right].k > a[largest].k) largest = right; T.set({ largest }); T.snap('ifr', `Compare the right child: largest = <b>${largest}</b>.`); }
+    if (largest === index) { T.snap('sret', `a[${index}] = ${show(a[index])} is at least as large as its children: <b>return</b>.`); break; }
+    [a[index], a[largest]] = [a[largest], a[index]]; T.cnt.mov++;
+    T.hi = { size, cmp: [index, largest] };
+    T.snap('sswap', `<b>Swap</b> a[${index}] and a[${largest}]: ${show(a[index])} moves up, ${show(a[largest])} moves down.`);
+    index = largest; T.set({ index }); T.snap('down', `Follow the value down: <b>index = ${index}</b>.`);
+  }
+  T.pop();
+  if (outer !== undefined) T.vars.i = outer;
+}
+
+const RUN = { merge: runMerge, quick: runQuick, heap: runHeap };
+
+function trace(algo, items, bug, pivot) {
+  const T = new Tracer(algo, items, bug, pivot || 'last');
+  T.snap('def', `Start. a = [${items.map(show).join(', ')}]. Press <b>Step</b> or the right arrow.`);
+  try { RUN[algo](T); }
+  catch (e) {
+    if (!(e instanceof RecursionLimit)) throw e;
+    T.stack.length = Math.min(T.stack.length, LIMIT);
+    T.snap(T.code.some(([l]) => l === 'left') ? 'left' : 'def',
+      `<b>RecursionError</b>: the call stack passed ${LIMIT} frames. The range never gets smaller, so the recursion never reaches its base case. (Python stops at 1,000.)`,
+      { end: true, error: true });
+  }
+  const last = T.frames[T.frames.length - 1];
+  if (!last.error) last.verdict = verdict(items, last.a);
+  return T.frames;
+}
+function verdict(input, out) {
+  const sorted = out.every((x, i) => i === 0 || out[i - 1].k <= x.k);
+  if (!sorted) return { ok: false, text: 'Not sorted!' };
+  if (!input.some(x => x.tag)) return { ok: true, text: 'Sorted' };
+  for (let i = 1; i < out.length; i++)
+    if (out[i - 1].k === out[i].k && out[i - 1].id > out[i].id)
+      return { ok: false, text: `Sorted, but NOT stable: ${out[i - 1].t} now comes before ${out[i].t}` };
+  return { ok: true, text: 'Sorted and stable: equal keys kept their order' };
+}
+
+// ---- view ------------------------------------------------------------------------------
+const S = { algo: 'merge', bug: false, pivot: 'last', preset: 'L', items: null, frames: [], at: 0, quiz: false, answered: {}, timer: null };
+
+function hl(text) {
+  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const hash = esc.indexOf('#');
+  let code = hash >= 0 ? esc.slice(0, hash) : esc, com = hash >= 0 ? esc.slice(hash) : '';
+  code = code.replace(/\b(def|for|in|if|not|and|while|return|else|range|len|True|None)\b/g, m =>
+    ['range', 'len'].includes(m) ? `<span class="f">${m}</span>` : ['True', 'None'].includes(m) ? `<span class="n">${m}</span>` : `<span class="k">${m}</span>`)
+    .replace(/\b(\d+)\b/g, '<span class="n">$1</span>');
+  return code + (com ? `<span class="c">${com}</span>` : '');
+}
+function renderCode() {
+  const code = codeFor(S.algo, S.bug, S.pivot);
+  $('code').innerHTML = code.map(([, t], i) =>
+    `<div class="ln${/MISTAKE/.test(t) ? ' mistake' : ''}" data-i="${i}"><span class="no">${i + 1}</span><span class="tx">${hl(t) || ' '}</span></div>`).join('');
+  const A = ALGOS[S.algo];
+  $('title').textContent = A.name + (S.bug ? ' — with the common mistake' : '');
+  $('blurb').textContent = S.bug ? A.bug : A.blurb;
+  $('pivot').classList.toggle('show', S.algo === 'quick');
+}
+
+function colClass(f, i) {
+  const h = f.hi || {}, fin = new Set(f.final);
+  if (h.all) return 'final';
+  if (S.algo === 'heap') {
+    if (i >= (h.size ?? f.a.length)) return 'final';
+    if (h.cmp && h.cmp.includes(i)) return 'cmp';
+    return '';
+  }
+  if (S.algo === 'quick') {
+    if (h.part) {
+      const [lo, b, j, hi] = h.part;
+      if (i < lo || i > hi) return fin.has(i) ? 'final out' : 'out';
+      if (h.placed === i) return 'final';
+      if (i === hi) return 'pivot';
+      if (h.cmp && h.cmp.includes(i)) return 'cmp';
+      if (i < b) return 'less';
+      if (i < j) return 'geq';
+      return '';
+    }
+    if (fin.has(i)) return 'final';
+    if (h.pivot === i) return 'pivot';
+    if (h.cmp && h.cmp.includes(i)) return 'cmp';
+    if (h.range && (i < h.range[0] || i >= h.range[1])) return 'out';
+    return '';
+  }
+  // merge
+  if (h.merge) {
+    const [lo, mid, hi] = h.merge;
+    if (i < lo || i >= hi) return 'out';
+    const taken = i < mid ? i < h.i : i < h.j;
+    const front = i === h.i && h.i < mid || i === h.j && h.j < hi;
+    return (i < mid ? 'left' : 'right') + (taken ? ' taken' : '') + (front ? ' cmp' : '');
+  }
+  if (h.range && (i < h.range[0] || i >= h.range[1])) return 'out';
+  if (h.merged) return 'final';
+  return '';
+}
+function ptrs(f, i) {
+  const h = f.hi || {}, out = [];
+  if (S.algo === 'merge' && h.merge) { if (i === h.i && h.i < h.merge[1]) out.push('i'); if (i === h.j && h.j < h.merge[2]) out.push('j'); }
+  if (S.algo === 'quick' && h.part) { const [lo, b, j] = h.part; if (i === b) out.push('b'); if (i === j && j < h.part[3]) out.push('j'); }
+  return out.join(' ');
+}
+function renderBars(f) {
+  const cards = S.items.some(x => x.tag);
+  const maxK = Math.max(1, ...S.items.map(x => x.k));
+  return `<div class="bars">${f.a.map((x, i) => {
+    const cls = colClass(f, i), p = ptrs(f, i);
+    const body = cards ? `<div class="card"><span class="key">${x.k}</span><span class="nm">${x.tag}</span></div>`
+      : `<div class="val">${x.t}</div><div class="bar" style="height:${8 + 66 * Math.max(0, x.k) / maxK}%"></div>`;
+    return `<div class="col ${cls}">${body}<div class="idx">${i}</div><div class="ptr">${p}</div></div>`;
+  }).join('')}</div>`;
+}
+function renderTree(f) {
+  const n = f.a.length, size = (f.hi && f.hi.size !== undefined) ? f.hi.size : n, all = f.hi && f.hi.all;
+  const levels = Math.max(1, Math.floor(Math.log2(Math.max(1, n))) + 1);
+  const W = Math.max(240, 2 ** (levels - 1) * 56), H = 150, pos = [];
+  for (let i = 0; i < n; i++) {
+    const lv = Math.floor(Math.log2(i + 1)), first = 2 ** lv - 1, count = 2 ** lv;
+    pos.push([W * (i - first + 0.5) / count, 18 + (H - 36) * (levels === 1 ? 0 : lv / (levels - 1))]);
+  }
+  let svg = `<svg class="tree" viewBox="0 0 ${W} ${H}" role="img" aria-label="the list as a tree">`;
+  for (let i = 1; i < n; i++) { const p = Math.floor((i - 1) / 2); svg += `<line x1="${pos[p][0]}" y1="${pos[p][1]}" x2="${pos[i][0]}" y2="${pos[i][1]}" class="${i >= size ? 'gone' : ''}"/>`; }
+  const cmp = new Set((f.hi && f.hi.cmp) || []);
+  for (let i = 0; i < n; i++) {
+    const cls = all || i >= size ? 'final' + (all ? '' : ' gone') : cmp.has(i) ? 'cmp' : '';
+    svg += `<g class="${cls}"><circle cx="${pos[i][0]}" cy="${pos[i][1]}" r="15"/><text x="${pos[i][0]}" y="${pos[i][1]}">${f.a[i].k}</text><text class="ix" x="${pos[i][0] + 21}" y="${pos[i][1] - 11}">${i}</text></g>`;
+  }
+  return svg + '</svg>';
+}
+function renderPic(f) {
+  let html = '';
+  if (S.algo === 'heap') html += renderTree(f);
+  html += renderBars(f);
+  if (S.algo === 'merge' && f.scratch) {
+    const h = f.hi || {};
+    html += `<div class="scratchrow"><span class="lab">scratch</span><div class="cells">${f.scratch.map((x, i) => {
+      const inRange = h.merge && i >= h.merge[0] && i < h.merge[2];
+      return `<span class="cell${h.merge && i === h.k && i < h.merge[2] ? ' k' : ''}${inRange ? '' : ' dim'}">${x ? x.t : '&nbsp;'}</span>`; }).join('')}</div></div>`;
+  }
+  $('pic').innerHTML = html;
+  const sw = (c, b, t) => `<span><span class="sw" style="background:var(--${c});border-color:var(--${b})"></span>${t}</span>`;
+  const leg = {
+    merge: [sw('wait-bg', 'wait', 'left run'), sw('run2-bg', 'run2', 'right run'), sw('accent-bg', 'accent', 'the two fronts'), sw('done-bg', 'done', 'merged'), '<span>i, j: the fronts · green underline: k</span>'],
+    quick: [sw('prefix-bg', 'line', '&lt; pivot'), sw('accent-bg', 'line', '≥ pivot'), sw('pivot-bg', 'pivot', 'the pivot'), sw('accent-bg', 'accent', 'a[j]'), sw('done-bg', 'done', 'final place'), '<span>b: boundary</span>'],
+    heap: [sw('accent-bg', 'accent', 'being compared'), sw('done-bg', 'done', 'sorted, final'), '<span>the tree and the bars are the same list</span>'],
+  }[S.algo];
+  $('legend').innerHTML = leg.join('');
+}
+function renderVars(f) {
+  const changed = new Set(f.changed);
+  $('vars').innerHTML = Object.entries(f.vars).map(([k, v]) => `<tr class="${changed.has(k) ? 'chg' : ''}"><td>${k}</td><td>${v}</td></tr>`).join('')
+    || '<tr><td colspan="2" style="color:var(--muted)">none yet</td></tr>';
+  const A = ALGOS[S.algo];
+  $('ctrs').innerHTML = `<div class="ctr"><span>Comparisons</span><b>${f.cnt.cmp}</b></div>
+    <div class="ctr"><span>${A.moves}</span><b>${f.cnt.mov}</b></div>
+    <div class="ctr inv"><span>Deepest call stack</span><b>${f.cnt.depth}</b></div>
+    <div class="cfoot">${{ merge: 'Each comparison sends exactly one value to scratch.', quick: 'One partition of m values makes m − 1 comparisons.', heap: 'One sift goes down at most log₂ n levels.' }[S.algo]}</div>`;
+  $('stack').innerHTML = f.stack.slice().reverse().map((s, i) => `<div class="fr${i === 0 ? ' top' : ''}">${s}</div>`).join('') || '<div class="fr" style="opacity:.5">empty</div>';
+}
+function renderChips(f) {
+  const out = [];
+  if (S.algo === 'quick' && f.vars.pivot !== undefined && !f.end) out.push(`<span class="chip cur">pivot = ${f.vars.pivot}</span>`);
+  if (f.verdict) out.push(`<span class="verdict ${f.verdict.ok ? 'ok' : 'bad'}">${f.verdict.ok ? '✓' : '✗'} ${f.verdict.text}</span>`);
+  if (f.error) out.push('<span class="verdict bad">✗ RecursionError</span>');
+  $('chips').innerHTML = out.join('');
+}
+function renderQuestion(f) {
+  const box = $('qbox'), st = S.answered[S.at];
+  if (!S.quiz || !f.q || !st) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="qcard" role="group" aria-label="Question"><div class="qlabel">What happens next?</div>
+    <div class="qtext">${f.q.text}</div><div class="choices">${f.q.choices.map((c, i) => {
+      const cls = st.picked === undefined ? '' : (i === f.q.answer ? ' right' : (i === st.picked ? ' wrong' : ''));
+      return `<button class="btn${cls}" data-c="${i}" ${st.picked !== undefined ? 'disabled' : ''}>${c}</button>`; }).join('')}</div>
+    ${st.picked !== undefined ? `<div class="qwhy">${st.picked === f.q.answer ? '<b>Right.</b> ' : '<b>Not quite.</b> '}${f.q.why} Press <b>Step</b> to see it.</div>` : ''}</div>`;
+  box.querySelectorAll('button[data-c]').forEach(b => b.onclick = () => { st.picked = +b.dataset.c; render(); });
+}
+function render() {
+  const f = S.frames[S.at];
+  document.querySelectorAll('.ln').forEach(el => el.classList.toggle('run', +el.dataset.i === f.line));
+  const run = document.querySelector('.ln.run'); if (run) run.scrollIntoView({ block: 'nearest' });
+  $('lineInfo').textContent = `line ${f.line + 1}`;
+  if (S.quiz && f.q && !S.timer && !S.answered[S.at]) S.answered[S.at] = {};
+  const waiting = S.quiz && f.q && S.answered[S.at] && S.answered[S.at].picked === undefined;
+  $('narr').innerHTML = waiting ? f.msg.replace(/\?[^?]*$/, '?').replace(/^([^?]*)$/, '$1') + ' <b>Answer below first.</b>' : f.msg;
+  renderPic(f); renderVars(f); renderChips(f); renderQuestion(f);
+  $('picMeta').textContent = `n = ${S.items.length}`;
+  $('scrub').max = S.frames.length - 1; $('scrub').value = S.at;
+  $('pos').textContent = `step ${S.at} / ${S.frames.length - 1}`;
+  $('bBack').disabled = S.at === 0; $('bStep').disabled = S.at === S.frames.length - 1;
+}
+
+// ---- control ---------------------------------------------------------------------------
+function rebuild() {
+  stop();
+  S.frames = trace(S.algo, S.items, S.bug, S.pivot);
+  S.at = 0; S.answered = {};
+  renderCode(); render();
+}
+function step() {
+  if (S.at >= S.frames.length - 1) return;
+  const f = S.frames[S.at];
+  if (S.quiz && f.q && !S.timer) { const st = S.answered[S.at]; if (!st || st.picked === undefined) return; }
+  S.at++; render();
+}
+function back() { if (S.at > 0) { S.at--; render(); } }
+function stop() { if (S.timer) { clearInterval(S.timer); S.timer = null; } $('bPlay').innerHTML = 'Play <kbd>P</kbd>'; }
+function play() {
+  if (S.timer) return stop();
+  if (S.at >= S.frames.length - 1) S.at = 0;
+  S.timer = setInterval(() => { if (S.at >= S.frames.length - 1) return stop(); S.at++; render(); }, 1100 - 100 * +$('speed').value);
+  $('bPlay').innerHTML = 'Pause <kbd>P</kbd>';
+}
+function setAlgo(a) {
+  S.algo = a; save('algo', a);
+  document.querySelectorAll('#algoSeg button').forEach(b => b.classList.toggle('on', b.dataset.a === a));
+  loadInput(); rebuild();
+}
+function loadInput() {
+  const p = PRESETS.find(x => x.id === S.preset) || PRESETS[0];
+  S.items = p.cards ? itemsFromCards(p.cards) : itemsFromValues(p.values || randomValues(8));
+}
+function runCustom() {
+  const raw = $('custom').value.trim(); if (!raw) return;
+  const vs = raw.split(/[\s,\[\]]+/).filter(Boolean).map(Number);
+  if (!vs.length || vs.some(v => !Number.isInteger(v))) { $('narr').innerHTML = 'Type whole numbers, for example <b>7, 2, 9, 4</b>.'; return; }
+  if (vs.length > 16) { $('narr').innerHTML = 'At most <b>16</b> values, so that the picture stays readable.'; return; }
+  S.items = itemsFromValues(vs); rebuild();
+}
+function save(k, v) { try { localStorage.setItem('fast-sorting-lab-' + k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem('fast-sorting-lab-' + k); } catch (e) { return null; } }
+function setTheme(t) { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); save('theme', t || ''); }
+function toggleQuiz() {
+  S.quiz = !S.quiz; S.answered = {};
+  $('bQuiz').classList.toggle('on', S.quiz);
+  $('bQuiz').innerHTML = `What happens next? ${S.quiz ? 'on' : 'off'} <kbd>Q</kbd>`;
+  render();
+}
+function toggleFs() { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }
+
+function init() {
+  $('algoSeg').innerHTML = Object.entries(ALGOS).map(([id, a]) => `<button data-a="${id}" role="tab">${a.short}</button>`).join('');
+  $('algoSeg').querySelectorAll('button').forEach(b => b.onclick = () => setAlgo(b.dataset.a));
+  $('preset').innerHTML = PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+  $('preset').onchange = () => { S.preset = $('preset').value; loadInput(); rebuild(); };
+  $('pivot').onchange = () => { S.pivot = $('pivot').value; rebuild(); };
+  $('runBtn').onclick = runCustom;
+  $('custom').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runCustom(); } });
+  $('bugBtn').onclick = () => { S.bug = !S.bug; $('bugBtn').classList.toggle('on', S.bug); rebuild(); };
+  $('bStep').onclick = step; $('bBack').onclick = back; $('bPlay').onclick = play;
+  $('bRestart').onclick = () => { stop(); S.at = 0; S.answered = {}; render(); };
+  $('scrub').oninput = () => { stop(); S.at = +$('scrub').value; render(); };
+  $('bQuiz').onclick = toggleQuiz;
+  $('themeBtn').onclick = () => {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+      (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+    setTheme(dark ? 'light' : 'dark');
+  };
+  $('fsBtn').onclick = toggleFs;
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input[type=text], select') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (k === 'ArrowRight' || k === ' ') { e.preventDefault(); step(); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); back(); }
+    else if (k === 'r' || k === 'R') $('bRestart').click();
+    else if (k === 'p' || k === 'P') play();
+    else if (k === 'q' || k === 'Q') toggleQuiz();
+    else if (k === 'm' || k === 'M') $('bugBtn').click();
+    else if (k === 'f' || k === 'F') toggleFs();
+  });
+  const t = load('theme'); if (t) setTheme(t);
+  // A link can open one exact step: #algo=quick&input=sorted16&pivot=first&mistake=1&at=40&quiz=1&theme=light
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (['light', 'dark'].includes(h.get('theme'))) setTheme(h.get('theme'));
+  if (PRESETS.some(p => p.id === h.get('input'))) { S.preset = h.get('input'); $('preset').value = S.preset; }
+  if (['last', 'first', 'median3', 'random'].includes(h.get('pivot'))) { S.pivot = h.get('pivot'); $('pivot').value = S.pivot; }
+  if (h.get('mistake') === '1') { S.bug = true; $('bugBtn').classList.add('on'); }
+  const a = ALGOS[h.get('algo')] ? h.get('algo') : load('algo');
+  setAlgo(ALGOS[a] ? a : 'merge');
+  const at = parseInt(h.get('at'), 10);
+  if (at > 0) { S.at = Math.min(at, S.frames.length - 1); render(); }
+  if (h.get('quiz') === '1') toggleQuiz();
+}
+
+/* Self-check: open the page as fast-sorting-lab.html#selftest. It checks the
+   numbers the lecture states about L, compares every sort with the built-in
+   sort on random lists, and checks stability and the common mistakes. */
+function selftest() {
+  const lines = [], ok = (c, m) => lines.push((c ? 'PASS ' : 'FAIL ') + m);
+  const L = itemsFromValues([7, 2, 9, 4, 1, 8, 3, 6]);
+  const last = (algo, items, bug, pivot) => trace(algo, items, bug, pivot).slice(-1)[0];
+  const keys = f => f.a.map(x => x.k).join(',');
+  let f = last('merge', L); ok(f.cnt.cmp === 17 && keys(f) === '1,2,3,4,6,7,8,9', `merge on L: ${f.cnt.cmp} comparisons (17), sorted`);
+  f = last('quick', L); ok(f.cnt.cmp === 14 && keys(f) === '1,2,3,4,6,7,8,9', `quick (last) on L: ${f.cnt.cmp} comparisons (14), sorted`);
+  f = last('heap', L); ok(f.cnt.cmp === 27 && keys(f) === '1,2,3,4,6,7,8,9', `heap on L: ${f.cnt.cmp} comparisons (27), sorted`);
+  const p0 = trace('quick', L).find(fr => fr.msg.includes('for good'));
+  ok(p0 && keys(p0) === '2,4,1,3,6,8,7,9', 'first partition of L puts the pivot 6 at index 4');
+  const h0 = trace('heap', L).find(fr => fr.msg.includes('max-heap'));
+  ok(h0 && keys(h0) === '9,6,8,4,1,7,3,2', 'build-heap on L gives [9, 6, 8, 4, 1, 7, 3, 2]');
+  const sorted8 = itemsFromValues([1, 2, 3, 4, 5, 6, 7, 8]);
+  f = last('quick', sorted8); ok(f.cnt.cmp === 28 && f.cnt.depth >= 8, `quick (last) on sorted 8: ${f.cnt.cmp} comparisons = n(n-1)/2, depth ${f.cnt.depth}`);
+  f = last('quick', sorted8, false, 'median3'); ok(f.cnt.cmp < 28, `quick (median3) on sorted 8: ${f.cnt.cmp} comparisons, fewer`);
+  const C = itemsFromCards(CARDS);
+  ok(last('merge', C).verdict.ok, 'merge on cards: stable');
+  ok(!last('quick', C).verdict.ok && !last('heap', C).verdict.ok, 'quick and heap on cards: not stable');
+  ok(!last('merge', C, true).verdict.ok, 'merge mistake (<) on cards: not stable');
+  ok(last('quick', L, true).error === true, 'quick mistake (sort(a, lo, p)): RecursionError');
+  f = last('heap', L, true); ok(keys(f) === '1,2,3,6,4,7,8,9', `heap mistake (root first) on L: [${keys(f)}] (not sorted)`);
+  let bad = 0;
+  for (let t = 0; t < 300; t++) {
+    const vs = randomValues(Math.floor(Math.random() * 13)), want = vs.slice().sort((x, y) => x - y).join(',');
+    for (const algo of ['merge', 'heap']) if (keys(last(algo, itemsFromValues(vs))) !== want) bad++;
+    for (const pv of ['last', 'first', 'median3', 'random']) if (keys(last('quick', itemsFromValues(vs), false, pv)) !== want) bad++;
+  }
+  ok(bad === 0, `300 random lists x 6 runs agree with the built-in sort (${bad} failures)`);
+  const pre = $('selftest'); pre.hidden = false; pre.textContent = lines.join('\n');
+  document.title = (lines.every(l => l.startsWith('PASS')) ? 'PASS' : 'FAIL') + ' — Fast Sorting Lab';
+}
+
+init();
+if (location.hash === '#selftest') selftest();
+</script>
+</body>
+</html>
