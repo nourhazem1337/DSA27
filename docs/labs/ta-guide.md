@@ -276,7 +276,7 @@ students' Checkpoints 2 to 4 use it, so your drawings are their answer key.
 2. Draw the merge tree of `[6, 5, 3, 1, 8, 7, 2, 4]` and number the merges in
    the order the recursion does them: left half completely first. Ask how many
    merges (7 = n – 1).
-3. Trace Lomuto's partition of `[6, 3, 9, 1, 8, 2, 7, 4]` (Lecture 10's figure)
+3. Trace Lomuto's partition of `[6, 3, 9, 1, 8, 2, 7, 4]` (question W10-M09)
    with three colours of chalk: green `< pivot`, amber `≥ pivot`, white not yet
    seen. Say the invariant aloud after every step.
 4. **The main event.** With a working quicksort projected, and a `Counted`
@@ -284,7 +284,7 @@ students' Checkpoints 2 to 4 use it, so your drawings are their answer key.
    `comparisons(quick_sort, list(range(n)), "first")` for n = 100, 200, 400.
    Collect guesses; run it: 4,950, 19,900, 79,800 — exactly n(n – 1)/2,
    times four per doubling. Then `"median3"`: 606, 1,407, 3,208. Draw the two
-   recursion shapes (Lecture 10, "The worst case, measured").
+   recursion shapes (Lecture 10, "Quicksort: the worst case").
 5. Write the inner `sort` **live, wrongly**: partition, then two recursive calls
    (`if lo < hi:` … `yield from sort(lo, q - 1)` … `yield from sort(q + 1, hi)`).
    Run `pytest tests/test_sorting.py -q -k quick`: 13 pass. Then run

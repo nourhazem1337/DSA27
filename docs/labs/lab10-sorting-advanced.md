@@ -148,7 +148,7 @@ print(list(a))          # [1, 2, 5, 5, 6, 9]
 
 # Part 2 — `merge_sort_steps` and `merge_sort`
 
-Lecture 10, "`merge_sort_steps`: divide, conquer, combine". One scratch
+Lecture 10, "Merge sort: the code" and "Watching your own code". One scratch
 `Array`, made once; an inner generator `sort(lo, hi)` that sorts `a[lo:hi]`;
 a snapshot after every merge.
 
@@ -257,7 +257,7 @@ the invariant says; keep it.
 
 # Part 4 — `quick_sort_steps`: pivots and the call stack
 
-Lecture 10, "Choosing the pivot" and "Stack depth: recurse on the smaller side".
+Lecture 10, "Choosing the pivot" and "Quicksort: the cost" (the box "Deeper — the stack depth").
 
 ## 4.1 `_choose_pivot(a, lo, hi, strategy, rng)`
 
@@ -325,7 +325,7 @@ Try the bad version once, on purpose, and see the `RecursionError` yourself.
 
 # Part 5 — `heap_sort_steps`: the array is the tree
 
-Lecture 10, "The array is the tree", "Sift down" and "Build-heap in $O(n)$".
+Lecture 10, "Heap sort", "Sift down: repair one parent" and "Heap sort: the code".
 The children of `a[i]` are `a[2i + 1]` and `a[2i + 2]`.
 
 ## 5.1 Draw it
@@ -394,7 +394,7 @@ passes "almost everything", check the direction of the build loop first.
 
 # Part 6 — Count the comparisons
 
-Lecture 10, "Measured". Lab 08 counted how many elements a search **reads**
+Lecture 10, "Six sorts, one picture". Lab 08 counted how many elements a search **reads**
 with a class that pretends to be a list. This week you count **comparisons**
 with a class that pretends to be a number. Not graded; write it in the
 notebook, not in `dsa/`.
@@ -474,7 +474,7 @@ ratio growing. That is Lecture 10's sum $n(1/4 + 2/8 + 3/16 + \dots)$, measured.
 
 # Part 7 — Stability, and the test that cannot see it
 
-Lecture 10, "Stability". A sort is stable if equal keys keep their input
+Lecture 10, "Stable or not". A sort is stable if equal keys keep their input
 order. `tests/test_sorting.py` checks stability for insertion sort only
 (`test_insertion_sort_is_stable`), and none of the 37 tests of this lab checks
 it at all: they sort plain numbers, and two equal numbers cannot be told apart.
@@ -513,7 +513,7 @@ property nobody has checked.
 
 # Part 8 — Measure the time: what are you timing?
 
-Lecture 10, "Measured", last paragraph. Time your `merge_sort` in the notebook:
+Lecture 10, "Watching your own code", the box "Deeper — the price of watching, again". Time your `merge_sort` in the notebook:
 
 ```python
 import random, time
