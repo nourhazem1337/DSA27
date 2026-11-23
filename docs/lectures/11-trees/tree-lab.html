@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tree Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+/* Layout: one-screen classroom console, as in the other DSA27 labs. Code on the left;
+   the picture of the list on the right, with the variables and counters under it;
+   transport bar along the bottom. */
+:root {
+  --bg: #e9edf2;
+  --panel: #ffffff;
+  --panel-2: #f4f6f9;
+  --ink: #142033;
+  --muted: #5a6679;
+  --line: #d3d9e2;
+  --accent: #c76a00;        /* the running line, the pair being compared */
+  --accent-bg: #ffefcc;
+  --wait: #3456c7;          /* the smallest so far, the current value */
+  --wait-bg: #e6ecfc;
+  --done: #23803a;          /* in its final place */
+  --done-bg: #e2f4e6;
+  --prefix-bg: #dcf3f6;     /* sorted so far, not yet final (insertion sort) */
+  --hole: #c92a3a;
+  --hole-bg: #fde4e7;
+  --bar: #c9d3e3;
+  --kw: #8a2bb8; --str: #237a3a; --num: #b4520b; --com: #7b8798; --fn: #1d5fd0;
+  --shadow: 0 1px 2px rgba(20,32,51,.06), 0 4px 14px rgba(20,32,51,.06);
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-code: "JetBrains Mono", Consolas, "Cascadia Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --panel: #171e28; --panel-2: #1d2532; --ink: #e4e9f1; --muted: #9aa6b8;
+    --line: #2b3545; --accent: #ffad47; --accent-bg: #3a2a12; --wait: #8ea6ff; --wait-bg: #1d2747;
+    --done: #6fd38a; --done-bg: #173322; --prefix-bg: #133338; --hole: #ff7b88; --hole-bg: #3a1a20;
+    --bar: #34405a; --kw: #d39bff; --str: #7fd492; --num: #ffb27a; --com: #7c879a; --fn: #8db6ff;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --panel: #171e28; --panel-2: #1d2532; --ink: #e4e9f1; --muted: #9aa6b8;
+  --line: #2b3545; --accent: #ffad47; --accent-bg: #3a2a12; --wait: #8ea6ff; --wait-bg: #1d2747;
+  --done: #6fd38a; --done-bg: #173322; --prefix-bg: #133338; --hole: #ff7b88; --hole-bg: #3a1a20;
+  --bar: #34405a; --kw: #d39bff; --str: #7fd492; --num: #ffb27a; --com: #7c879a; --fn: #8db6ff;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--f-body);
+  display: grid; grid-template-rows: auto 1fr auto; }
+button, select, input { font: inherit; color: inherit; }
+.mono, code, kbd, .code, .chip, .cell, .val, .idx, .vars table { font-family: var(--f-code); font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+kbd { font-size: 11px; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); }
+
+header.top { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.brand b { font-size: 18px; margin-right: 8px; }
+.brand span { color: var(--muted); font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 6px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--ink); color: var(--panel); }
+.inputs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inputs select, .inputs input[type=text] { padding: 6px 8px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--panel-2); }
+.inputs input[type=text] { width: 15em; font-family: var(--f-code); font-size: 13px; }
+.tools { margin-left: auto; display: flex; gap: 6px; }
+.btn { padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2);
+  cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.btn.on { background: var(--accent-bg); border-color: var(--accent); }
+.btn.bug.on { background: var(--hole-bg); border-color: var(--hole); }
+.btn:disabled { opacity: .45; cursor: default; }
+
+main { display: grid; gap: 12px; padding: 12px; min-height: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "code pic" "code vars"; }
+.pane { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.pane-head { display: flex; justify-content: space-between; gap: 8px; padding: 8px 14px;
+  border-bottom: 1px solid var(--line); font-weight: 700; }
+.pane-head .meta { font-weight: 400; color: var(--muted); font-size: 13px; }
+.code-pane { grid-area: code; }
+.pic-pane { grid-area: pic; }
+.vars-pane { grid-area: vars; }
+
+.about { padding: 10px 14px 4px; }
+.about h1 { font-size: 17px; margin: 0 0 2px; }
+.about p { margin: 0; color: var(--muted); font-size: 14px; }
+.code { font: 13.5px/1.6 var(--f-code); padding: 8px 0; overflow: auto; flex: 0 0 auto; }
+.ln { display: grid; grid-template-columns: 3em 1fr; white-space: pre; padding-right: 12px; }
+.ln .no { color: var(--muted); text-align: right; padding-right: 1em; user-select: none; }
+.ln.run { background: var(--accent-bg); box-shadow: inset 3px 0 var(--accent); }
+.ln.mistake .tx { text-decoration: underline wavy var(--hole); text-underline-offset: 4px; }
+.k { color: var(--kw); } .n { color: var(--num); } .c { color: var(--com); font-style: italic; } .f { color: var(--fn); }
+.narr { margin: 6px 14px 14px; padding: 10px 12px; border-radius: 10px; background: var(--panel-2);
+  border: 1px solid var(--line); min-height: 4.2em; }
+.narr b { color: var(--accent); }
+.qcard { margin: 0 14px 14px; padding: 10px 12px; border: 2px solid var(--wait); border-radius: 10px; background: var(--wait-bg); }
+.qlabel { font-weight: 700; color: var(--wait); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.qtext { margin: 4px 0 8px; }
+.choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.choices .btn.right { background: var(--done-bg); border-color: var(--done); }
+.choices .btn.wrong { background: var(--hole-bg); border-color: var(--hole); }
+.qwhy { margin-top: 8px; font-size: 14px; }
+
+.picbox { flex: 1; min-height: 220px; padding: 12px 16px 8px; display: flex; flex-direction: column; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; align-items: center; }
+.chip { font-family: var(--f-code); font-size: 13px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); }
+.chip.cur { border-color: var(--wait); background: var(--wait-bg); color: var(--wait); font-weight: 700; }
+.verdict { font-weight: 700; padding: 3px 10px; border-radius: 8px; }
+.verdict.ok { color: var(--done); background: var(--done-bg); }
+.verdict.bad { color: var(--hole); background: var(--hole-bg); }
+.bars { height: clamp(170px, 34vh, 360px); display: flex; align-items: flex-end; gap: 6px; }
+.col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+.bar { width: 100%; border-radius: 6px 6px 2px 2px; background: var(--bar); border: 2px solid transparent;
+  transition: height .18s ease, background-color .18s; display: flex; align-items: flex-start; justify-content: center; }
+.val { font: 700 13px var(--f-code); margin-bottom: 3px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.idx { font: 11px var(--f-code); color: var(--muted); margin-top: 4px; }
+.card { width: 100%; height: 76px; border-radius: 8px; border: 2px solid var(--line); background: var(--panel-2);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.card .key { font: 700 22px var(--f-code); }
+.card .nm { font-size: 12px; color: var(--muted); }
+.cmp .bar, .cmp .card { background: var(--accent-bg); border-color: var(--accent); }
+.min .bar, .min .card { background: var(--wait-bg); border-color: var(--wait); }
+.final .bar, .final .card { background: var(--done-bg); border-color: var(--done); }
+.prefix .bar, .prefix .card { background: var(--prefix-bg); }
+.hole .bar, .hole .card { background: var(--hole-bg); border: 2px dashed var(--hole); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 2px solid var(--line); }
+
+.rows { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; }
+.rows .lab { font: 13px var(--f-code); color: var(--muted); text-align: right; }
+.cells { display: flex; flex-wrap: wrap; gap: 4px; }
+.cell { min-width: 2.2em; padding: 4px 6px; text-align: center; font: 700 14px var(--f-code); border: 1px solid var(--line);
+  border-radius: 6px; background: var(--panel-2); position: relative; }
+.cell sub { position: absolute; top: -14px; left: 0; right: 0; font: 10px var(--f-code); color: var(--muted); }
+.cells.idxd { margin-top: 12px; row-gap: 18px; }
+.cell.cmp { background: var(--accent-bg); border-color: var(--accent); }
+.cell.final { background: var(--done-bg); border-color: var(--done); }
+
+.varwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.vars, .counters { padding: 8px 14px 12px; }
+.counters { border-left: 1px solid var(--line); }
+.vars table { border-collapse: collapse; font: 13.5px var(--f-code); }
+.vars td { padding: 2px 10px 2px 0; }
+.vars td:first-child { color: var(--muted); }
+.vars tr.chg td:last-child { color: var(--accent); font-weight: 700; }
+.ctr { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; font-size: 14px; }
+.ctr b { font: 700 16px var(--f-code); }
+.ctr.inv b { color: var(--wait); }
+.cfoot { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+footer.transport { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 16px;
+  background: var(--panel); border-top: 1px solid var(--line); }
+.group { display: flex; gap: 6px; flex-wrap: wrap; }
+.speed, .scrub { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.scrub { flex: 1; min-width: 180px; }
+.scrub input { flex: 1; }
+.pos { font: 12px var(--f-code); min-width: 7em; text-align: right; }
+#selftest { margin: 12px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; white-space: pre-wrap; }
+
+@media (max-width: 1050px) {
+  html, body { height: auto; }
+  body { display: block; }
+  main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "pic" "vars" "code"; }
+  .picbox { min-height: 260px; }
+  footer.transport { position: sticky; bottom: 0; z-index: 2; }
+}
+@media (max-width: 560px) {
+  .varwrap { grid-template-columns: 1fr; }
+  .counters { border-left: 0; border-top: 1px solid var(--line); }
+  .tools { margin-left: 0; }
+  .inputs { width: 100%; }
+  .inputs select, .inputs input[type=text] { flex: 1 1 100%; width: auto; min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+/* Last, so that no `font:` shorthand above resets it: students must see >= and != as typed. */
+.code, .code *, .chip, .cell, .val, .idx, .vars table, .ctr b, kbd, input[type=text] {
+  font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+/* Tree Lab additions: the tree, the output list, the queue, the call stack. */
+.stackbox { padding: 8px 14px 12px; border-top: 1px solid var(--line); }
+.frames { display: flex; flex-direction: column; gap: 3px; font: 12.5px var(--f-code); max-height: 8.5em; overflow: auto; }
+.fr { padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+.fr.top { border-color: var(--accent); background: var(--accent-bg); font-weight: 700; }
+.treewrap { flex: 1; min-height: 220px; display: flex; align-items: center; justify-content: center; }
+svg.tree { width: 100%; max-height: 360px; }
+svg.tree line { stroke: var(--muted); stroke-width: 2; }
+svg.tree line.path { stroke: var(--wait); stroke-width: 3.5; }
+svg.tree circle { fill: var(--panel-2); stroke: var(--muted); stroke-width: 1.6; }
+svg.tree text { font: 700 15px var(--f-code); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+svg.tree .path circle { stroke: var(--wait); stroke-width: 3; }
+svg.tree .visited circle { fill: var(--done-bg); }
+svg.tree .cur circle { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 3.5; }
+svg.tree .found circle, svg.tree .new circle { fill: var(--done-bg); stroke: var(--done); stroke-width: 3.5; }
+svg.tree .succ circle { fill: var(--wait-bg); stroke: var(--wait); stroke-width: 3.5; stroke-dasharray: 5 3; }
+svg.tree .gone circle { fill: var(--hole-bg); stroke: var(--hole); stroke-dasharray: 4 3; }
+svg.tree .bad circle { fill: var(--hole-bg); stroke: var(--hole); stroke-width: 3; }
+svg.tree .lbl { font: 11px var(--f-code); fill: var(--muted); }
+.ghost { font: 700 13px var(--f-code); color: var(--muted); }
+.listrow { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-height: 28px; }
+.listrow .lab { font: 12px var(--f-code); color: var(--muted); min-width: 4.4em; }
+.listrow .cell.new { background: var(--done-bg); border-color: var(--done); }
+.listrow .cell.front { background: var(--accent-bg); border-color: var(--accent); }
+.opbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.opbar select, .opbar input[type=text] { padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.opbar input.val { width: 5em; font-family: var(--f-code); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><b>Tree Lab</b><span>DSA27 · Lecture 11</span></div>
+  <div class="inputs">
+    <select id="preset" aria-label="Tree"></select>
+    <input type="text" id="custom" placeholder="build from: 50, 30, 70" aria-label="Build a tree from your values">
+    <button class="btn" id="buildBtn" title="Build a tree from your values (Enter)">Build</button>
+  </div>
+  <div class="opbar">
+    <select id="op" aria-label="Operation"></select>
+    <input type="text" id="val" class="val" value="7" aria-label="Value">
+    <button class="btn primary" id="runBtn" title="Run this operation">Run</button>
+  </div>
+  <div class="tools">
+    <button class="btn bug" id="bugBtn" title="Run the common mistake (M)">Common mistake <kbd>M</kbd></button>
+    <button class="btn" id="themeBtn" title="Switch light / dark">Theme</button>
+    <button class="btn" id="fsBtn" title="Full screen (F)">Full screen</button>
+  </div>
+</header>
+
+<main>
+  <section class="pane code-pane">
+    <div class="pane-head"><span>Code</span><span class="meta" id="lineInfo"></span></div>
+    <div class="about"><h1 id="title"></h1><p id="blurb"></p></div>
+    <div class="code" id="code"></div>
+    <div class="narr" id="narr" aria-live="polite"></div>
+    <div id="qbox"></div>
+  </section>
+
+  <section class="pane pic-pane">
+    <div class="pane-head"><span>The tree</span><span class="meta" id="picMeta"></span></div>
+    <div class="picbox">
+      <div class="chips" id="chips"></div>
+      <div class="treewrap" id="pic"></div>
+      <div id="lists"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+
+  <section class="pane vars-pane">
+    <div class="varwrap">
+      <div class="vars"><div class="pane-head" style="padding:0 0 6px;border:0">Variables</div><table id="vars"></table></div>
+      <div class="counters"><div class="pane-head" style="padding:0 0 6px;border:0">Counters</div><div id="ctrs"></div></div>
+    </div>
+    <div class="stackbox"><div class="pane-head" style="padding:0 0 6px;border:0"><span>Call stack</span><span class="meta">newest on top</span></div><div class="frames" id="stack"></div></div>
+  </section>
+</main>
+
+<footer class="transport">
+  <div class="group">
+    <button class="btn" id="bRestart" title="Back to the start (R)">Restart <kbd>R</kbd></button>
+    <button class="btn" id="bBack" title="One step back (Left arrow)">Back <kbd>&larr;</kbd></button>
+    <button class="btn primary" id="bStep" title="One step (Right arrow or Space)">Step <kbd>&rarr;</kbd></button>
+    <button class="btn" id="bPlay" title="Play / pause (P)">Play <kbd>P</kbd></button>
+  </div>
+  <div class="speed"><label for="speed">Speed</label><input type="range" id="speed" min="1" max="10" value="5"></div>
+  <div class="scrub"><input type="range" id="scrub" min="0" max="0" value="0" aria-label="Jump to step"><span class="pos" id="pos"></span></div>
+  <button class="btn" id="bQuiz" title="Ask before each decision (Q)">What happens next? off <kbd>Q</kbd></button>
+</footer>
+
+<pre id="selftest" hidden></pre>
+
+<script>
+/* =====================================================================
+   ENGINE. Each operation is a JavaScript mirror of the Python on screen,
+   line for line. The tree is a table of nodes {v, l, r} (l and r are
+   indices into the table, or -1 for None). An operation runs once on a
+   copy of the tree, and the tracer keeps a snapshot at every step, so
+   Back and the scrubber are only an index into that list. When an
+   operation that changes the tree ends, its result becomes the tree that
+   the next operation starts from.
+   ===================================================================== */
+
+const $ = id => document.getElementById(id);
+const NONE = -1;
+
+// ---- the code on screen ----------------------------------------------------------
+const CODE = {
+  contains: () => [
+    ['def',  'def contains(self, value):'],
+    ['init', '    node = self.root'],
+    ['loop', '    while node is not None:'],
+    ['eq',   '        if value == node.value:'],
+    ['yes',  '            return True'],
+    ['step', S.bug ? '        node = node.right if value < node.value else node.left   # MISTAKE: the sides are swapped'
+                   : '        node = node.left if value < node.value else node.right'],
+    ['no',   '    return False'],
+  ],
+  insert: () => S.bug ? [
+    ['def',  'def insert(self, value):'],
+    ['empty','    if self.root is None:'],
+    ['rootn','        self.root = TreeNode(value); return'],
+    ['init', '    node = self.root'],
+    ['loop', '    while node is not None:               # MISTAKE: walks past the parent'],
+    ['eq',   '        if value == node.value:'],
+    ['dup',  '            return'],
+    ['step', '        node = node.left if value < node.value else node.right'],
+    ['hang', '    node = TreeNode(value)                # only a LOCAL variable changes'],
+  ] : [
+    ['def',  'def insert(self, value):'],
+    ['new',  '    new = TreeNode(value)'],
+    ['empty','    if self.root is None:'],
+    ['rootn','        self.root = new; return            # the new node IS the root'],
+    ['init', '    node = self.root'],
+    ['loop', '    while True:'],
+    ['eq',   '        if value == node.value:'],
+    ['dup',  '            return                         # already there: ignore'],
+    ['lt',   '        if value < node.value:'],
+    ['lnone','            if node.left is None:          # stop AT the parent ...'],
+    ['lhang','                node.left = new; return     # ... and set its link'],
+    ['lgo',  '            node = node.left'],
+    ['else', '        else:'],
+    ['rnone','            if node.right is None:'],
+    ['rhang','                node.right = new; return'],
+    ['rgo',  '            node = node.right'],
+  ],
+  min: () => [
+    ['def',  'def min(self):'],
+    ['empty','    if self.root is None:'],
+    ['err',  '        raise ValueError("min of an empty tree")'],
+    ['init', '    node = self.root'],
+    ['loop', '    while node.left is not None:         # go left for as long as you can'],
+    ['go',   '        node = node.left'],
+    ['ret',  '    return node.value'],
+  ],
+  max: () => [
+    ['def',  'def max(self):'],
+    ['empty','    if self.root is None:'],
+    ['err',  '        raise ValueError("max of an empty tree")'],
+    ['init', '    node = self.root'],
+    ['loop', '    while node.right is not None:        # go right for as long as you can'],
+    ['go',   '        node = node.right'],
+    ['ret',  '    return node.value'],
+  ],
+  delete: () => [
+    ['def',  'def delete(self, value):'],
+    ['init', '    parent, node = None, self.root'],
+    ['find', '    while node is not None and node.value != value:   # 1. find it, and its parent'],
+    ['fstep','        parent = node; node = node.left if value < node.value else node.right'],
+    ['nf',   '    if node is None:'],
+    ['nfr',  '        return                                         # not there'],
+    ['two',  '    if node.left is not None and node.right is not None:'],
+    ['sinit','        parent, successor = node, node.right           # 2. right once,'],
+    ['sloop','        while successor.left is not None:              #    then left as far as possible'],
+    ['sstep','            parent, successor = successor, successor.left'],
+    ['copy', '        node.value = successor.value                   #    copy it up ...'],
+    ['hand', '        node = successor                               #    ... and delete IT instead'],
+    ['child','    child = node.left if node.left is not None else node.right   # 3. at most one child'],
+    ['root', '    if parent is None:'],
+    ['setr', '        self.root = child'],
+    ...(S.bug ? [
+      ['else', '    else:'],
+      ['setl', '        parent.left = child                            # MISTAKE: always the LEFT link'],
+    ] : [
+      ['isl',  '    elif parent.left is node:'],
+      ['setl', '        parent.left = child'],
+      ['else', '    else:'],
+      ['setrr','        parent.right = child'],
+    ]),
+  ],
+  in_order: () => walkCode('in'),
+  pre_order: () => walkCode('pre'),
+  post_order: () => walkCode('post'),
+  level_order: () => [
+    ['def',  'def level_order(self):'],
+    ['out',  '    out = []'],
+    ['empty','    if self.root is None: return out'],
+    ['q',    S.bug ? '    queue = Stack()                    # MISTAKE: last in, first out'
+                   : '    queue = CircularQueue()            # first in, first out'],
+    ['enq0', S.bug ? '    queue.push(self.root)' : '    queue.enqueue(self.root)'],
+    ['loop', '    while not queue.is_empty():'],
+    ['deq',  S.bug ? '        node = queue.pop()' : '        node = queue.dequeue()'],
+    ['app',  '        out.append(node.value)'],
+    ['enql', S.bug ? '        if node.left is not None:  queue.push(node.left)' : '        if node.left is not None:  queue.enqueue(node.left)'],
+    ['enqr', S.bug ? '        if node.right is not None: queue.push(node.right)' : '        if node.right is not None: queue.enqueue(node.right)'],
+    ['ret',  '    return out'],
+  ],
+  height: () => [
+    ['def',  'def height(self):'],
+    ['call', '    return self._height(self.root)'],
+    ['_1',   ''],
+    ['hdef', 'def _height(self, node):'],
+    ['base', '    if node is None:'],
+    ['bret', S.bug ? '        return 0                          # MISTAKE: counts nodes, not edges' : '        return -1                         # the empty tree'],
+    ['rec',  '    return 1 + max(self._height(node.left), self._height(node.right))'],
+  ],
+  is_valid: () => S.bug ? [
+    ['def',  'def is_valid(self):'],
+    ['call', '    return self._is_valid(self.root)'],
+    ['_1',   ''],
+    ['vdef', 'def _is_valid(self, node):             # MISTAKE: checks only the children'],
+    ['base', '    if node is None: return True'],
+    ['lchk', '    if node.left is not None and node.left.value >= node.value: return False'],
+    ['rchk', '    if node.right is not None and node.right.value <= node.value: return False'],
+    ['rec',  '    return self._is_valid(node.left) and self._is_valid(node.right)'],
+  ] : [
+    ['def',  'def is_valid(self):'],
+    ['call', '    return self._is_valid(self.root, None, None)     # no limits at the root'],
+    ['_1',   ''],
+    ['vdef', 'def _is_valid(self, node, low, high):'],
+    ['base', '    if node is None: return True                     # the empty tree is valid'],
+    ['low',  '    if low is not None and node.value <= low: return False'],
+    ['high', '    if high is not None and node.value >= high: return False'],
+    ['rec',  '    return (self._is_valid(node.left, low, node.value)       # left: new high'],
+    ['rec2', '            and self._is_valid(node.right, node.value, high))  # right: new low'],
+  ],
+};
+function walkCode(kind) {
+  const name = { in: 'in_order', pre: 'pre_order', post: 'post_order' }[kind];
+  const app = ['app', '        out.append(node.value)'];
+  const L = ['left', `        self._${name}(node.left, out)`], R = ['right', `        self._${name}(node.right, out)`];
+  const body = kind === 'pre' ? [app, L, R] : kind === 'in' ? [L, app, R] : [L, R, app];
+  return [
+    ['def',  `def ${name}(self):`],
+    ['out',  '    out = []                            # one list for the whole walk'],
+    ['call', `    self._${name}(self.root, out)`],
+    ['ret',  '    return out'],
+    ['_1',   ''],
+    ['hdef', `def _${name}(self, node, out):`],
+    ['base', '    if node is not None:'],
+    ...body,
+  ];
+}
+
+const OPS = {
+  insert:      { label: 'insert(value)', needs: true, changes: true, blurb: 'Walk down as in search; where the way on is None, hang the new node there. A new value always becomes a leaf.',
+                 bug: 'The loop walks until node is None, then assigns node = TreeNode(value). That only changes a local variable: the parent’s link never changes, and the tree never sees the new node.' },
+  contains:    { label: 'contains(value)', needs: true, blurb: 'Compare, then go left or right: every comparison rules out a whole subtree.',
+                 bug: 'The two sides are swapped: smaller values go right. The search walks away from the value and never finds it.' },
+  delete:      { label: 'delete(value)', needs: true, changes: true, blurb: 'Find the node and its parent. Two children? Copy in the in-order successor and delete that node instead. Then point the parent at the one child left.',
+                 bug: 'Step 3 always writes parent.left. Deleting a node whose successor is its own right child (try delete 8 on T) then hangs the subtree on the wrong side, and loses nodes.' },
+  min:         { label: 'min()', blurb: 'Go left for as long as you can. No comparisons at all.' },
+  max:         { label: 'max()', blurb: 'Go right for as long as you can. No comparisons at all.' },
+  in_order:    { label: 'in_order()', blurb: 'Left subtree, node, right subtree. For a BST: the values sorted.' },
+  pre_order:   { label: 'pre_order()', blurb: 'Node, left subtree, right subtree. Re-inserting the result rebuilds the same tree.' },
+  post_order:  { label: 'post_order()', blurb: 'Left subtree, right subtree, node. Children before parents: frees and evaluates.' },
+  level_order: { label: 'level_order()', blurb: 'Nearest to the root first. The nodes found but not yet visited wait in a queue.',
+                 bug: 'A stack instead of a queue: last in, first out. The walk goes deep before it goes wide, so it is no longer level by level.' },
+  height:      { label: 'height()', blurb: 'One more than the taller subtree; the empty tree is -1, so a leaf is 0. A post-order walk.',
+                 bug: 'The empty tree returns 0, so the code counts nodes instead of edges: every height comes out one too large.' },
+  is_valid:    { label: 'is_valid()', blurb: 'Carry the allowed range (low, high) down: going left, the new high is the node; going right, the new low.',
+                 bug: 'Each node is compared only with its own children. A value deep in the wrong subtree is never noticed: try the broken tree.' },
+};
+
+const PRESETS = [
+  { id: 'T',      label: "T — the lecture's tree", values: [8, 3, 10, 1, 6, 14, 4, 7, 13] },
+  { id: 'Q',      label: "Q — the question bank's tree", values: [30, 15, 45, 8, 20, 40, 60, 17, 25, 50] },
+  { id: 'chain',  label: 'Sorted 1..7: a chain', values: [1, 2, 3, 4, 5, 6, 7] },
+  { id: 'middle', label: 'Middle first: 4, 2, 6, …', values: [4, 2, 6, 1, 3, 5, 7] },
+  { id: 'hw',     label: 'Homework 11, item 2', values: [50, 30, 70, 20, 40, 60, 80, 35, 45, 65] },
+  { id: 'broken', label: 'Broken: NOT a BST (9 left of 8)', broken: true },
+  { id: 'empty',  label: 'Empty tree', values: [] },
+];
+
+// ---- the tree as a table -----------------------------------------------------------------
+function emptyTree() { return { nodes: [], root: NONE }; }
+function plainInsert(t, v) {
+  const id = t.nodes.length;
+  if (t.root === NONE) { t.nodes.push({ v, l: NONE, r: NONE }); t.root = id; return; }
+  let n = t.root;
+  for (;;) {
+    const node = t.nodes[n];
+    if (v === node.v) return;
+    const side = v < node.v ? 'l' : 'r';
+    if (node[side] === NONE) { t.nodes.push({ v, l: NONE, r: NONE }); node[side] = id; return; }
+    n = node[side];
+  }
+}
+function buildTree(values) { const t = emptyTree(); for (const v of values) plainInsert(t, v); return t; }
+function brokenTree() {   // 8 with 3 and 10; 9 as 3's right child: every parent-child pair looks fine
+  return { root: 0, nodes: [{ v: 8, l: 1, r: 2 }, { v: 3, l: 3, r: 4 }, { v: 10, l: NONE, r: NONE }, { v: 1, l: NONE, r: NONE }, { v: 9, l: NONE, r: NONE }] };
+}
+function copyTree(t) { return { root: t.root, nodes: t.nodes.map(n => ({ ...n })) }; }
+function reachable(t) {
+  const seen = new Set(), stack = t.root === NONE ? [] : [t.root];
+  while (stack.length) { const n = stack.pop(); if (seen.has(n)) continue; seen.add(n); const x = t.nodes[n]; if (x.r !== NONE) stack.push(x.r); if (x.l !== NONE) stack.push(x.l); }
+  return seen;
+}
+function inorderValues(t) {
+  const out = [], seen = new Set();
+  (function go(n) { if (n === NONE || seen.has(n)) return; seen.add(n); go(t.nodes[n].l); out.push(t.nodes[n].v); go(t.nodes[n].r); })(t.root);
+  return out;
+}
+function treeHeight(t) {
+  const seen = new Set();
+  return (function h(n) { if (n === NONE || seen.has(n)) return -1; seen.add(n); return 1 + Math.max(h(t.nodes[n].l), h(t.nodes[n].r)); })(t.root);
+}
+function validBST(t) {
+  const seen = new Set();
+  return (function ok(n, lo, hi) {
+    if (n === NONE) return true;
+    if (seen.has(n)) return false; seen.add(n);
+    const v = t.nodes[n].v;
+    if ((lo !== null && v <= lo) || (hi !== null && v >= hi)) return false;
+    return ok(t.nodes[n].l, lo, v) && ok(t.nodes[n].r, v, hi);
+  })(t.root, null, null);
+}
+
+// ---- tracer --------------------------------------------------------------------------------
+class Tracer {
+  constructor(op, tree, value) {
+    this.op = op; this.value = value; this.code = CODE[op]();
+    this.t = copyTree(tree); this.vars = {}; this.changed = new Set();
+    this.cnt = { cmp: 0, visits: 0 }; this.hi = {}; this.path = []; this.stack = [];
+    this.out = null; this.queue = null; this.frames = [];
+  }
+  line(label) { const i = this.code.findIndex(([l]) => l === label); if (i < 0) throw new Error('no line ' + label); return i; }
+  set(o) { for (const k in o) { this.vars[k] = o[k]; this.changed.add(k); } }
+  snap(label, msg, extra) {
+    this.frames.push({ line: this.line(label), msg, tree: copyTree(this.t), vars: { ...this.vars }, changed: [...this.changed],
+      cnt: { ...this.cnt }, hi: { ...this.hi }, path: this.path.slice(), stack: this.stack.slice(),
+      out: this.out ? this.out.slice() : null, queue: this.queue ? this.queue.slice() : null, ...(extra || {}) });
+    this.changed = new Set();
+    return this.frames[this.frames.length - 1];
+  }
+  ask(q) { this.frames[this.frames.length - 1].q = q; }
+  v(n) { return n === NONE ? 'None' : this.t.nodes[n].v; }
+}
+const nodeName = (T, n) => n === NONE ? 'None' : `node(${T.t.nodes[n].v})`;
+
+function runContains(T) {
+  const value = T.value, t = T.t;
+  T.set({ value }); T.snap('def', `<b>contains(${value})</b>: is ${value} in the tree?`);
+  let n = t.root; T.set({ node: nodeName(T, n) }); T.hi = { cur: n }; T.snap('init', 'Start at the <b>root</b>.');
+  while (true) {
+    T.hi = { cur: n };
+    if (n === NONE) { T.snap('loop', '<b>node is None</b>: we fell off the tree, exactly where the value would have been.'); break; }
+    T.path.push(n); T.cnt.visits++;
+    T.snap('loop', `node is ${T.v(n)}, not None.`);
+    T.cnt.cmp++;
+    const x = t.nodes[n].v;
+    const dir = value === x ? 0 : ((value < x) !== S.bug ? 1 : 2);
+    T.snap('eq', `Is ${value} == ${x}? <b>${value === x ? 'Yes' : 'No'}</b>.`);
+    T.ask({ text: `Searching for ${value}. We are at ${x}. What happens next?`, choices: [`Found it: return True`, `Go left`, `Go right`], answer: dir,
+      why: dir === 0 ? `${value} == ${x}.` : S.bug ? 'With the mistake, the sides are swapped.' : `${value} ${value < x ? '<' : '>'} ${x}, so ${value} can only be in the ${value < x ? 'left' : 'right'} subtree.` });
+    if (value === x) { T.hi = { found: n }; T.snap('yes', `<b>Found ${value}</b> after ${T.cnt.cmp} comparison${T.cnt.cmp === 1 ? '' : 's'}. return True.`, { end: true, result: 'True' }); return; }
+    if (T.cnt.cmp > 60) break;
+    T.cnt.cmp++;
+    n = dir === 1 ? t.nodes[n].l : t.nodes[n].r;
+    T.set({ node: nodeName(T, n) }); T.hi = { cur: n };
+    T.snap('step', `${value} ${value < x ? '<' : '>'} ${x}: go <b>${dir === 1 ? 'left' : 'right'}</b>${n === NONE ? ', to None' : ''}.`);
+  }
+  T.snap('no', `<b>return False</b>: ${value} is not in the tree.`, { end: true, result: 'False' });
+}
+
+function runInsert(T) {
+  const value = T.value, t = T.t;
+  T.set({ value }); T.snap('def', `<b>insert(${value})</b>.`);
+  if (S.bug) {
+    if (t.root === NONE) { T.snap('empty', 'The tree is empty.'); t.nodes.push({ v: value, l: NONE, r: NONE }); t.root = 0; T.hi = { neu: 0 }; T.snap('rootn', 'The new node is the root.', { end: true }); return; }
+    T.snap('empty', 'The tree is not empty.');
+    let n = t.root; T.set({ node: nodeName(T, n) }); T.hi = { cur: n }; T.snap('init', 'Start at the root.');
+    for (;;) {
+      T.hi = { cur: n };
+      T.snap('loop', n === NONE ? '<b>node is None</b>. The loop ends — and the parent is gone: no variable points at it any more.' : `node is ${T.v(n)}.`);
+      if (n === NONE) break;
+      T.path.push(n); T.cnt.visits++; T.cnt.cmp++;
+      const x = t.nodes[n].v;
+      T.snap('eq', `Is ${value} == ${x}? ${value === x ? 'Yes.' : 'No.'}`);
+      if (value === x) { T.snap('dup', 'Already there: return.', { end: true }); return; }
+      T.cnt.cmp++;
+      n = value < x ? t.nodes[n].l : t.nodes[n].r; T.set({ node: nodeName(T, n) }); T.hi = { cur: n };
+      T.snap('step', `${value} ${value < x ? '<' : '>'} ${x}: go ${value < x ? 'left' : 'right'}.`);
+    }
+    T.set({ node: `TreeNode(${value})` }); T.hi = {};
+    T.snap('hang', `<b>node = TreeNode(${value})</b> rebinds a local variable. No link in the tree changed: the tree is exactly as before.`, { end: true, ghost: value, lost: true });
+    return;
+  }
+  T.set({ new: `TreeNode(${value})` }); T.snap('new', `Make the new node, <b>TreeNode(${value})</b>, with no children.`);
+  if (t.root === NONE) {
+    T.snap('empty', 'The tree is empty.');
+    t.nodes.push({ v: value, l: NONE, r: NONE }); t.root = t.nodes.length - 1; T.hi = { neu: t.root };
+    T.snap('rootn', `<b>self.root = new</b>: ${value} is the root.`, { end: true }); return;
+  }
+  T.snap('empty', 'The tree is not empty.');
+  let n = t.root; T.set({ node: nodeName(T, n) }); T.hi = { cur: n }; T.snap('init', 'Start at the root.');
+  for (;;) {
+    const x = t.nodes[n].v; T.path.push(n); T.cnt.visits++;
+    T.hi = { cur: n }; T.cnt.cmp++;
+    T.snap('eq', `At ${x}. Is ${value} == ${x}? ${value === x ? 'Yes.' : 'No.'}`);
+    const side = value < x ? 'l' : 'r', next = t.nodes[n][side];
+    T.ask({ text: `Inserting ${value}. We are at ${x}. What happens next?`,
+      choices: ['Already there: do nothing', `Hang ${value} as ${x}'s left child`, `Go left`, `Hang ${value} as ${x}'s right child`, 'Go right'],
+      answer: value === x ? 0 : side === 'l' ? (next === NONE ? 1 : 2) : (next === NONE ? 3 : 4),
+      why: value === x ? 'Values are unique: a duplicate changes nothing.' : `${value} ${side === 'l' ? '<' : '>'} ${x}, and ${x}'s ${side === 'l' ? 'left' : 'right'} child is ${next === NONE ? 'None: this is the parent, so hang the node here' : t.nodes[next].v + ': keep walking'}.` });
+    if (value === x) { T.snap('dup', `${value} is already in the tree: <b>return</b>, nothing changes.`, { end: true }); return; }
+    T.cnt.cmp++;
+    if (side === 'l') {
+      T.snap('lt', `${value} < ${x}: the left side.`);
+      T.snap('lnone', `Is ${x}'s left child None? <b>${next === NONE ? 'Yes' : 'No'}</b>.`);
+      if (next === NONE) { t.nodes.push({ v: value, l: NONE, r: NONE }); t.nodes[n].l = t.nodes.length - 1; T.hi = { neu: t.nodes.length - 1, par: n }; T.snap('lhang', `<b>node.left = new</b>: ${value} hangs as ${x}'s left child, a new leaf. Nothing moved.`, { end: true }); return; }
+      n = next; T.set({ node: nodeName(T, n) }); T.snap('lgo', `Go left, to ${T.v(n)}.`);
+    } else {
+      T.snap('else', `${value} > ${x}: the right side.`);
+      T.snap('rnone', `Is ${x}'s right child None? <b>${next === NONE ? 'Yes' : 'No'}</b>.`);
+      if (next === NONE) { t.nodes.push({ v: value, l: NONE, r: NONE }); t.nodes[n].r = t.nodes.length - 1; T.hi = { neu: t.nodes.length - 1, par: n }; T.snap('rhang', `<b>node.right = new</b>: ${value} hangs as ${x}'s right child, a new leaf. Nothing moved.`, { end: true }); return; }
+      n = next; T.set({ node: nodeName(T, n) }); T.snap('rgo', `Go right, to ${T.v(n)}.`);
+    }
+  }
+}
+
+function runMinMax(T, side) {
+  const t = T.t, word = side === 'l' ? 'left' : 'right';
+  T.snap('def', `<b>${T.op}()</b>.`);
+  if (t.root === NONE) { T.snap('empty', 'The tree is empty.'); T.snap('err', `<b>ValueError</b>: an empty tree has no ${T.op}.`, { end: true, error: true }); return; }
+  T.snap('empty', 'The tree is not empty.');
+  let n = t.root; T.set({ node: nodeName(T, n) }); T.hi = { cur: n }; T.path.push(n); T.cnt.visits++;
+  T.snap('init', 'Start at the root.');
+  for (;;) {
+    const next = t.nodes[n][side];
+    T.snap('loop', `Does ${T.v(n)} have a ${word} child? <b>${next === NONE ? 'No' : 'Yes, ' + t.nodes[next].v}</b>.`);
+    T.ask({ text: `At ${T.v(n)}. Where is the ${T.op}?`, choices: [`Here: ${T.v(n)}`, `Further ${word}`], answer: next === NONE ? 0 : 1,
+      why: next === NONE ? `Nothing is ${side === 'l' ? 'smaller' : 'larger'} than ${T.v(n)}: there is no ${word} child.` : `Everything ${side === 'l' ? 'smaller' : 'larger'} is to the ${word}.` });
+    if (next === NONE) break;
+    n = next; T.path.push(n); T.cnt.visits++; T.set({ node: nodeName(T, n) }); T.hi = { cur: n };
+    T.snap('go', `Go ${word}, to ${T.v(n)}.`);
+  }
+  T.hi = { found: n };
+  T.snap('ret', `<b>return ${T.v(n)}</b> — and not one comparison of values: the invariant did the comparing when the values were inserted.`, { end: true, result: String(T.v(n)) });
+}
+
+function runDelete(T) {
+  const value = T.value, t = T.t;
+  T.set({ value }); T.snap('def', `<b>delete(${value})</b>.`);
+  let parent = NONE, n = t.root;
+  T.set({ parent: 'None', node: nodeName(T, n) }); T.hi = { cur: n }; T.snap('init', 'Start at the root, with no parent.');
+  for (;;) {
+    T.hi = { cur: n, par: parent };
+    if (n === NONE) { T.snap('find', 'node is None.'); break; }
+    T.path.push(n); T.cnt.visits++; T.cnt.cmp++;
+    const x = t.nodes[n].v;
+    T.snap('find', `At ${x}: ${x === value ? `found <b>${value}</b>` : `${x} != ${value}, keep looking`}.`);
+    if (x === value) break;
+    T.cnt.cmp++;
+    parent = n; n = value < x ? t.nodes[n].l : t.nodes[n].r;
+    T.set({ parent: nodeName(T, parent), node: nodeName(T, n) }); T.hi = { cur: n, par: parent };
+    T.snap('fstep', `${value} ${value < x ? '<' : '>'} ${x}: go ${value < x ? 'left' : 'right'}; ${x} becomes the parent.`);
+  }
+  T.snap('nf', n === NONE ? `${value} is not in the tree.` : `${value} is in the tree.`);
+  if (n === NONE) { T.snap('nfr', '<b>return</b>: nothing to delete.', { end: true }); return; }
+  const kids = (t.nodes[n].l !== NONE) + (t.nodes[n].r !== NONE);
+  T.hi = { cur: n, par: parent };
+  T.snap('two', `${value} has <b>${kids === 0 ? 'no children' : kids === 1 ? 'one child' : 'two children'}</b>.`);
+  T.ask({ text: `${value} has ${kids === 0 ? 'no children' : kids === 1 ? 'one child' : 'two children'}. Which case is it?`,
+    choices: ['A leaf: the parent’s link becomes None', 'One child: the parent’s link points at that child', 'Two children: copy in the in-order successor'], answer: kids,
+    why: ['A leaf has nothing below it to keep.', 'The one subtree moves up one level, still in order.', 'Two subtrees cannot hang from one link: replace the value instead.'][kids] });
+  if (kids === 2) {
+    const target = n;
+    parent = n; let s = t.nodes[n].r;
+    T.set({ parent: nodeName(T, parent), successor: nodeName(T, s) }); T.hi = { cur: target, succ: s, par: parent };
+    T.snap('sinit', `The successor is the smallest value in ${value}'s right subtree: go <b>right once</b>, to ${T.v(s)}.`);
+    for (;;) {
+      const next = t.nodes[s].l;
+      T.snap('sloop', `Does ${T.v(s)} have a left child? <b>${next === NONE ? 'No: ' + T.v(s) + ' is the successor' : 'Yes, ' + t.nodes[next].v}</b>.`);
+      T.ask({ text: `Looking for the in-order successor of ${value}. Is ${T.v(s)} it?`, choices: [`Yes: ${T.v(s)} is the successor`, 'No: go further left'], answer: next === NONE ? 0 : 1,
+        why: next === NONE ? `Nothing in the right subtree is smaller than ${T.v(s)}.` : `${t.nodes[next].v} is smaller and still larger than ${value}.` });
+      if (next === NONE) break;
+      parent = s; s = next; T.set({ parent: nodeName(T, parent), successor: nodeName(T, s) }); T.hi = { cur: target, succ: s, par: parent };
+      T.snap('sstep', `Go left, to ${T.v(s)}.`);
+    }
+    t.nodes[target].v = t.nodes[s].v;
+    T.hi = { cur: target, succ: s, par: parent };
+    T.snap('copy', `<b>Copy ${t.nodes[s].v} up</b> into the node that held ${value}. For a moment the tree holds two ${t.nodes[s].v}s.`);
+    n = s; T.set({ node: nodeName(T, n) }); T.hi = { cur: n, par: parent, gone: n };
+    T.snap('hand', `Now delete <b>the old ${T.v(n)}</b> instead. It has no left child, so it is one of the easy cases.`);
+  }
+  const child = t.nodes[n].l !== NONE ? t.nodes[n].l : t.nodes[n].r;
+  T.set({ child: nodeName(T, child) }); T.hi = { gone: n, par: parent, kid: child };
+  T.snap('child', `<b>child = ${child === NONE ? 'None' : T.v(child)}</b>: the one child that ${T.v(n)} has${child === NONE ? ' — none, it is a leaf' : ''}.`);
+  T.snap('root', parent === NONE ? 'There is no parent: the node is the root.' : `The parent is ${T.v(parent)}.`);
+  if (parent === NONE) { t.root = child; T.hi = { kid: child }; T.snap('setr', `<b>self.root = ${child === NONE ? 'None' : T.v(child)}</b>.`, { end: true }); return; }
+  if (S.bug) {
+    T.snap('else', 'The code does not ask which side the node hangs on.');
+    t.nodes[parent].l = child; T.hi = { par: parent, kid: child };
+    const lost = buildLost(T);
+    T.snap('setl', `<b>parent.left = ${child === NONE ? 'None' : T.v(child)}</b> — always the left link.${lost}`, { end: true });
+    return;
+  }
+  const isLeft = t.nodes[parent].l === n;
+  T.snap('isl', `Is the node ${T.v(parent)}'s <b>left</b> child? ${isLeft ? 'Yes.' : 'No.'}`);
+  if (isLeft) { t.nodes[parent].l = child; T.hi = { par: parent, kid: child }; T.snap('setl', `<b>parent.left = ${child === NONE ? 'None' : T.v(child)}</b>. Done: the tree is still a BST.`, { end: true }); return; }
+  T.snap('else', 'It is the right child.');
+  t.nodes[parent].r = child; T.hi = { par: parent, kid: child };
+  T.snap('setrr', `<b>parent.right = ${child === NONE ? 'None' : T.v(child)}</b>. Done: the tree is still a BST.`, { end: true });
+}
+function buildLost(T) {
+  const vals = inorderValues(T.t);
+  const sorted = vals.every((v, i) => i === 0 || vals[i - 1] < v);
+  return sorted ? '' : ` The in-order walk is now [${vals.join(', ')}]: <b>not sorted</b>, so this is no longer a BST.`;
+}
+
+function runWalk(T, kind) {
+  const t = T.t, name = T.op;
+  T.out = []; T.snap('def', `<b>${name}()</b>.`);
+  T.snap('out', '<b>out = []</b>: one list for the whole walk.');
+  T.set({}); T.snap('call', `Start the walk at the root: <b>_${name}(${t.root === NONE ? 'None' : 'node(' + t.nodes[t.root].v + ')'}, out)</b>.`);
+  (function walk(n) {
+    T.stack.push(`_${name}(${n === NONE ? 'None' : 'node(' + t.nodes[n].v + ')'})`);
+    T.set({ node: nodeName(T, n) }); T.hi = { cur: n };
+    T.snap('hdef', `<b>_${name}(${n === NONE ? 'None' : T.v(n)})</b>.`);
+    T.snap('base', n === NONE ? 'node is None: the empty tree — <b>do nothing</b>, return.' : `node is ${T.v(n)}, not None.`);
+    if (n !== NONE) {
+      T.cnt.visits++;
+      const parts = kind === 'pre' ? ['app', 'left', 'right'] : kind === 'in' ? ['left', 'app', 'right'] : ['left', 'right', 'app'];
+      for (const p of parts) {
+        T.set({ node: nodeName(T, n) }); T.hi = { cur: n };
+        if (p === 'app') {
+          const remaining = inorderValues(T.t).filter(v => !T.out.includes(v) && v !== t.nodes[n].v);
+          const opts = [t.nodes[n].v, ...remaining.slice(0, 2)].sort((a, b) => a - b);
+          T.ask({ text: `out = [${T.out.join(', ')}]. Which value is appended next?`, choices: opts.map(String), answer: opts.indexOf(t.nodes[n].v),
+            why: { pre: 'Pre-order writes a node before its subtrees.', in: 'In-order writes a node after its whole left subtree.', post: 'Post-order writes a node after both its subtrees.' }[kind] });
+          T.out.push(t.nodes[n].v); T.hi = { cur: n, visited: true };
+          T.snap('app', `<b>out.append(${T.v(n)})</b> → [${T.out.join(', ')}].`);
+        } else {
+          const c = p === 'left' ? t.nodes[n].l : t.nodes[n].r;
+          T.snap(p, `Walk ${T.v(n)}'s <b>${p}</b> subtree${c === NONE ? ' — it is empty' : ', rooted at ' + T.v(c)}.`);
+          walk(c);
+        }
+      }
+    }
+    T.stack.pop();
+  })(t.root);
+  T.set({}); T.hi = { allVisited: true };
+  T.snap('ret', `<b>return [${T.out.join(', ')}]</b>${kind === 'in' ? ' — sorted, because the tree is a BST.' : '.'}`, { end: true, result: `[${T.out.join(', ')}]` });
+}
+
+function runLevel(T) {
+  const t = T.t;
+  T.out = []; T.snap('def', '<b>level_order()</b>.');
+  T.snap('out', '<b>out = []</b>.');
+  T.snap('empty', t.root === NONE ? 'The tree is empty: return [].' : 'The tree is not empty.');
+  if (t.root === NONE) { T.snap('empty', '<b>return []</b>.', { end: true, result: '[]' }); return; }
+  T.queue = []; T.snap('q', S.bug ? 'A <b>stack</b>: the last node pushed comes out first.' : 'A <b>queue</b>: the first node in comes out first.');
+  T.queue.push(t.root); T.snap('enq0', `${S.bug ? 'Push' : 'Enqueue'} the root, ${T.v(t.root)}.`);
+  let guard = 0;
+  while (T.queue.length && guard++ < 200) {
+    T.hi = {}; T.snap('loop', `The ${S.bug ? 'stack' : 'queue'} holds [${T.queue.map(x => T.v(x)).join(', ')}]: not empty.`);
+    const next = S.bug ? T.queue[T.queue.length - 1] : T.queue[0];
+    const opts = [...new Set([next, T.queue[0], T.queue[T.queue.length - 1]])].map(x => T.v(x));
+    if (opts.length > 1) T.ask({ text: `${S.bug ? 'Stack' : 'Queue'}: [${T.queue.map(x => T.v(x)).join(', ')}]. Which node comes out next?`, choices: opts.map(String), answer: opts.indexOf(T.v(next)),
+      why: S.bug ? 'A stack gives back the LAST node pushed.' : 'A queue gives back the node that has waited longest: the FRONT.' });
+    const n = S.bug ? T.queue.pop() : T.queue.shift();
+    T.cnt.visits++; T.set({ node: nodeName(T, n) }); T.hi = { cur: n };
+    T.snap('deq', `<b>${S.bug ? 'pop' : 'dequeue'}</b> → ${T.v(n)}.`);
+    T.out.push(t.nodes[n].v); T.hi = { cur: n, visited: true };
+    T.snap('app', `<b>out.append(${T.v(n)})</b> → [${T.out.join(', ')}].`);
+    const l = t.nodes[n].l, r = t.nodes[n].r;
+    if (l !== NONE) T.queue.push(l);
+    T.snap('enql', l === NONE ? `${T.v(n)} has no left child.` : `${S.bug ? 'Push' : 'Enqueue'} the left child, ${T.v(l)}.`);
+    if (r !== NONE) T.queue.push(r);
+    T.snap('enqr', r === NONE ? `${T.v(n)} has no right child.` : `${S.bug ? 'Push' : 'Enqueue'} the right child, ${T.v(r)}.`);
+  }
+  T.hi = { allVisited: true };
+  T.snap('ret', `<b>return [${T.out.join(', ')}]</b>${S.bug ? ' — not level by level: the stack went deep first.' : ': level by level, left to right.'}`, { end: true, result: `[${T.out.join(', ')}]` });
+}
+
+function runHeight(T) {
+  const t = T.t;
+  T.snap('def', '<b>height()</b>: the number of edges on the longest path down from the root.');
+  T.snap('call', 'Start at the root.');
+  const res = (function h(n) {
+    T.stack.push(`_height(${n === NONE ? 'None' : 'node(' + t.nodes[n].v + ')'})`);
+    T.set({ node: nodeName(T, n) }); T.hi = { cur: n };
+    T.snap('hdef', `<b>_height(${n === NONE ? 'None' : T.v(n)})</b>.`);
+    T.snap('base', n === NONE ? 'node is None.' : `node is ${T.v(n)}, not None.`);
+    let r;
+    if (n === NONE) { r = S.bug ? 0 : -1; T.snap('bret', `The empty tree: <b>return ${r}</b>.`); }
+    else {
+      T.cnt.visits++;
+      T.snap('rec', `First the heights of ${T.v(n)}'s two subtrees — its children are handled before it: post-order.`);
+      const a = h(t.nodes[n].l); T.set({ node: nodeName(T, n), left: a }); T.hi = { cur: n };
+      const b = h(t.nodes[n].r); T.set({ node: nodeName(T, n), left: a, right: b }); T.hi = { cur: n };
+      r = 1 + Math.max(a, b);
+      T.snap('rec', `<b>1 + max(${a}, ${b}) = ${r}</b>: the height of ${T.v(n)}.`);
+    }
+    T.stack.pop(); return r;
+  })(t.root);
+  T.set({}); T.hi = {};
+  T.snap('call', `<b>return ${res}</b>${S.bug ? ` — one too many: this counted nodes. The height in edges is ${treeHeight(t)}.` : '.'}`, { end: true, result: String(res) });
+}
+
+function runValid(T) {
+  const t = T.t;
+  T.snap('def', '<b>is_valid()</b>: is this a binary search tree?');
+  T.snap('call', S.bug ? 'Start at the root.' : 'Start at the root, with no limits: low = None, high = None.');
+  const fmt = x => x === null ? 'None' : x;
+  let bad = NONE;
+  const res = (function ok(n, lo, hi) {
+    T.stack.push(S.bug ? `_is_valid(${n === NONE ? 'None' : 'node(' + t.nodes[n].v + ')'})` : `_is_valid(${n === NONE ? 'None' : 'node(' + t.nodes[n].v + ')'}, ${fmt(lo)}, ${fmt(hi)})`);
+    T.set(S.bug ? { node: nodeName(T, n) } : { node: nodeName(T, n), low: fmt(lo), high: fmt(hi) }); T.hi = { cur: n };
+    T.snap('vdef', n === NONE ? 'An empty subtree.' : S.bug ? `Check ${T.v(n)} against its own children only.` : `${T.v(n)} must lie strictly between ${fmt(lo)} and ${fmt(hi)}.`);
+    T.snap('base', n === NONE ? 'node is None: <b>return True</b>.' : `node is ${T.v(n)}.`);
+    let r = true;
+    if (n !== NONE) {
+      T.cnt.visits++;
+      const v = t.nodes[n].v;
+      if (S.bug) {
+        const l = t.nodes[n].l, rr = t.nodes[n].r;
+        T.cnt.cmp++; T.snap('lchk', l === NONE ? 'No left child.' : `Left child ${T.v(l)} < ${v}? ${T.v(l) < v ? 'Yes, fine.' : 'No!'}`);
+        if (l !== NONE && T.v(l) >= v) { r = false; bad = n; }
+        if (r) { T.cnt.cmp++; T.snap('rchk', rr === NONE ? 'No right child.' : `Right child ${T.v(rr)} > ${v}? ${T.v(rr) > v ? 'Yes, fine.' : 'No!'}`); if (rr !== NONE && T.v(rr) <= v) { r = false; bad = n; } }
+        if (r) { T.snap('rec', 'Both children look fine: check the subtrees.'); r = ok(l, null, null) && ok(rr, null, null); }
+      } else {
+        T.cnt.cmp++;
+        const tooLow = lo !== null && v <= lo, tooHigh = hi !== null && v >= hi;
+        T.snap('low', lo === null ? 'No lower limit.' : `Is ${v} <= ${lo}? ${tooLow ? '<b>Yes: too small!</b>' : 'No, fine.'}`);
+        T.ask({ text: `Is ${v} inside the allowed range (${fmt(lo)}, ${fmt(hi)})?`, choices: ['Yes: check its subtrees', 'No: return False'], answer: tooLow || tooHigh ? 1 : 0,
+          why: tooLow || tooHigh ? `${v} is ${tooLow ? 'not above ' + lo : 'not below ' + hi}: a value deep in the wrong subtree.` : `${fmt(lo)} < ${v} < ${fmt(hi)}.` });
+        if (tooLow) { r = false; bad = n; T.hi = { bad: n }; }
+        else {
+          T.cnt.cmp++;
+          T.snap('high', hi === null ? 'No upper limit.' : `Is ${v} >= ${hi}? ${tooHigh ? '<b>Yes: too large!</b>' : 'No, fine.'}`);
+          if (tooHigh) { r = false; bad = n; T.hi = { bad: n }; }
+          else {
+            T.snap('rec', `Check the left subtree with the range (${fmt(lo)}, ${v}).`);
+            r = ok(t.nodes[n].l, lo, v);
+            T.set({ node: nodeName(T, n), low: fmt(lo), high: fmt(hi) }); T.hi = { cur: n };
+            if (r) { T.snap('rec2', `Check the right subtree with the range (${v}, ${fmt(hi)}).`); r = ok(t.nodes[n].r, v, hi); }
+          }
+        }
+      }
+    }
+    T.stack.pop(); return r;
+  })(t.root, null, null);
+  T.set({}); T.hi = bad !== NONE ? { bad } : {};
+  T.snap('call', `<b>return ${res ? 'True' : 'False'}</b>${res ? (validBST(t) ? '' : ' — WRONG: this tree is not a BST. Checking only the children cannot see it.') : ` — ${T.v(bad)} breaks the BST property.`}`, { end: true, result: res ? 'True' : 'False' });
+}
+
+const RUN = {
+  contains: runContains, insert: runInsert, delete: runDelete,
+  min: T => runMinMax(T, 'l'), max: T => runMinMax(T, 'r'),
+  in_order: T => runWalk(T, 'in'), pre_order: T => runWalk(T, 'pre'), post_order: T => runWalk(T, 'post'),
+  level_order: runLevel, height: runHeight, is_valid: runValid,
+};
+function trace(op, tree, value) { const T = new Tracer(op, tree, value); RUN[op](T); return T.frames; }
+
+// ---- view ---------------------------------------------------------------------------------
+const S = { preset: 'T', tree: null, op: 'contains', value: 7, bug: false, frames: [], at: 0, quiz: false, answered: {}, timer: null };
+
+function hl(text) {
+  const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const hash = esc.indexOf('#');
+  let code = hash >= 0 ? esc.slice(0, hash) : esc, com = hash >= 0 ? esc.slice(hash) : '';
+  code = code.replace(/\b(def|for|in|if|elif|else|not|and|is|while|return|raise|self)\b/g, m => m === 'self' ? `<span class="f">${m}</span>` : `<span class="k">${m}</span>`)
+    .replace(/\b(None|True|False|\d+)\b/g, '<span class="n">$1</span>');
+  return code + (com ? `<span class="c">${com}</span>` : '');
+}
+function renderCode() {
+  const code = CODE[S.op]();
+  $('code').innerHTML = code.map(([, t], i) =>
+    `<div class="ln${/MISTAKE/.test(t) ? ' mistake' : ''}" data-i="${i}"><span class="no">${i + 1}</span><span class="tx">${hl(t) || ' '}</span></div>`).join('');
+  const o = OPS[S.op];
+  $('title').textContent = o.label.replace('value', S.value) + (S.bug ? ' — with the common mistake' : '');
+  $('blurb').textContent = S.bug ? o.bug : o.blurb;
+  $('bugBtn').disabled = !o.bug; if (!o.bug) $('bugBtn').classList.remove('on');
+  $('val').style.display = o.needs ? '' : 'none';
+}
+function layout(t) {
+  const pos = new Map(); let x = 0, maxD = 0; const seen = new Set();
+  (function go(n, d) { if (n === NONE || seen.has(n)) return; seen.add(n); go(t.nodes[n].l, d + 1); pos.set(n, [x++, d]); maxD = Math.max(maxD, d); go(t.nodes[n].r, d + 1); })(t.root, 0);
+  return { pos, count: x, depth: maxD };
+}
+function renderTree(f) {
+  const t = f.tree, L = layout(t), h = f.hi || {};
+  if (!L.count) { $('pic').innerHTML = `<div class="ghost">the empty tree${f.ghost !== undefined ? ` — TreeNode(${f.ghost}) went nowhere` : ''}</div>`; return; }
+  const dx = 52, dy = 64, W = Math.max(3, L.count) * dx, H = (L.depth + 1) * dy + 10;
+  const P = n => { const [i, d] = L.pos.get(n); return [dx / 2 + i * dx + (Math.max(3, L.count) - L.count) * dx / 2, 30 + d * dy]; };
+  const onPath = new Set(f.path);
+  let svg = `<svg class="tree" viewBox="0 0 ${W} ${H}" role="img" aria-label="the tree">`;
+  for (const [n] of L.pos) for (const c of [t.nodes[n].l, t.nodes[n].r]) if (c !== NONE && L.pos.has(c)) {
+    const [x1, y1] = P(n), [x2, y2] = P(c);
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${onPath.has(n) && onPath.has(c) ? 'path' : ''}"/>`;
+  }
+  const visitedVals = new Set(f.out || []);
+  for (const [n] of L.pos) {
+    const [x, y] = P(n), v = t.nodes[n].v;
+    let cls = '';
+    if (onPath.has(n)) cls = 'path';
+    if ((h.allVisited || f.out) && visitedVals.has(v)) cls = 'visited';
+    if (h.par === n) cls = 'path';
+    if (h.succ === n) cls = 'succ';
+    if (h.cur === n) cls = 'cur';
+    if (h.found === n || h.neu === n) cls = h.found === n ? 'found' : 'new';
+    if (h.gone === n) cls = 'gone';
+    if (h.bad === n) cls = 'bad';
+    let lbl = '';
+    if (h.par === n && S.op === 'delete') lbl = 'parent';
+    if (h.succ === n) lbl = 'successor';
+    svg += `<g class="${cls}"><circle cx="${x}" cy="${y}" r="19"/><text x="${x}" y="${y}">${v}</text>${lbl ? `<text class="lbl" x="${x}" y="${y + 31}">${lbl}</text>` : ''}</g>`;
+  }
+  $('pic').innerHTML = svg + '</svg>';
+}
+function renderLists(f) {
+  let html = '';
+  if (f.out) html += `<div class="listrow"><span class="lab">out</span>${f.out.map((v, i) => `<span class="cell${i === f.out.length - 1 && f.changedOut !== false ? ' new' : ''}">${v}</span>`).join('') || '<span class="cell" style="opacity:.45">[ ]</span>'}</div>`;
+  if (f.queue) html += `<div class="listrow"><span class="lab">${S.bug ? 'stack' : 'queue'}</span>${f.queue.map((n, i) => `<span class="cell${(S.bug ? i === f.queue.length - 1 : i === 0) ? ' front' : ''}">${f.tree.nodes[n].v}</span>`).join('') || '<span class="cell" style="opacity:.45">empty</span>'}<span class="lab" style="min-width:0">${S.bug ? '← top' : '← front … back'}</span></div>`;
+  $('lists').innerHTML = html;
+  const sw = (c, b, t, dash) => `<span><span class="sw" style="background:var(--${c});border-color:var(--${b})${dash ? ';border-style:dashed' : ''}"></span>${t}</span>`;
+  const leg = [sw('accent-bg', 'accent', 'the current node'), sw('panel-2', 'wait', 'the path so far')];
+  if (S.op === 'delete') leg.push(sw('wait-bg', 'wait', 'the successor', true), sw('hole-bg', 'hole', 'the node removed', true));
+  if (['in_order', 'pre_order', 'post_order', 'level_order'].includes(S.op)) leg.push(sw('done-bg', 'line', 'already in out'));
+  leg.push(sw('done-bg', 'done', 'found / new'));
+  $('legend').innerHTML = leg.join('');
+}
+function renderVars(f) {
+  const changed = new Set(f.changed);
+  $('vars').innerHTML = Object.entries(f.vars).map(([k, v]) => `<tr class="${changed.has(k) ? 'chg' : ''}"><td>${k}</td><td>${v}</td></tr>`).join('') || '<tr><td colspan="2" style="color:var(--muted)">none yet</td></tr>';
+  $('ctrs').innerHTML = `<div class="ctr"><span>Comparisons of values</span><b>${f.cnt.cmp}</b></div>
+    <div class="ctr"><span>Nodes visited</span><b>${f.cnt.visits}</b></div>
+    <div class="ctr inv"><span>Height of the tree</span><b>${treeHeight(f.tree)}</b></div>
+    <div class="cfoot">${['contains', 'insert', 'delete', 'min', 'max'].includes(S.op) ? 'One path down: at most height + 1 nodes.' : 'A walk visits every node once: O(n).'}</div>`;
+  $('stack').innerHTML = f.stack.slice().reverse().map((s, i) => `<div class="fr${i === 0 ? ' top' : ''}">${s}</div>`).join('') || '<div class="fr" style="opacity:.5">no recursive calls</div>';
+}
+function renderChips(f) {
+  const out = [];
+  if (f.result !== undefined) out.push(`<span class="chip cur">returned ${f.result}</span>`);
+  if (f.end && !f.error) {
+    const ok = validBST(f.tree), vals = inorderValues(f.tree);
+    out.push(`<span class="verdict ${ok ? 'ok' : 'bad'}">${ok ? '✓ still a BST' : '✗ NOT a BST any more'} · ${vals.length} node${vals.length === 1 ? '' : 's'}</span>`);
+    if (f.lost) out.push('<span class="verdict bad">✗ the tree did not change</span>');
+  }
+  if (f.error) out.push('<span class="verdict bad">✗ ValueError</span>');
+  $('chips').innerHTML = out.join('');
+}
+function renderQuestion(f) {
+  const box = $('qbox'), st = S.answered[S.at];
+  if (!S.quiz || !f.q || !st) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="qcard" role="group" aria-label="Question"><div class="qlabel">What happens next?</div>
+    <div class="qtext">${f.q.text}</div><div class="choices">${f.q.choices.map((c, i) => {
+      const cls = st.picked === undefined ? '' : (i === f.q.answer ? ' right' : (i === st.picked ? ' wrong' : ''));
+      return `<button class="btn${cls}" data-c="${i}" ${st.picked !== undefined ? 'disabled' : ''}>${c}</button>`; }).join('')}</div>
+    ${st.picked !== undefined ? `<div class="qwhy">${st.picked === f.q.answer ? '<b>Right.</b> ' : '<b>Not quite.</b> '}${f.q.why} Press <b>Step</b> to see it.</div>` : ''}</div>`;
+  box.querySelectorAll('button[data-c]').forEach(b => b.onclick = () => { st.picked = +b.dataset.c; render(); });
+}
+function render() {
+  const f = S.frames[S.at];
+  document.querySelectorAll('.ln').forEach(el => el.classList.toggle('run', +el.dataset.i === f.line));
+  const run = document.querySelector('.ln.run'); if (run) run.scrollIntoView({ block: 'nearest' });
+  $('lineInfo').textContent = `line ${f.line + 1}`;
+  if (S.quiz && f.q && !S.timer && !S.answered[S.at]) S.answered[S.at] = {};
+  const waiting = S.quiz && f.q && S.answered[S.at] && S.answered[S.at].picked === undefined;
+  $('narr').innerHTML = waiting ? 'Think first. <b>Answer below.</b>' : f.msg;
+  renderTree(f); renderLists(f); renderVars(f); renderChips(f); renderQuestion(f);
+  $('picMeta').textContent = `${inorderValues(f.tree).length} nodes`;
+  $('scrub').max = S.frames.length - 1; $('scrub').value = S.at;
+  $('pos').textContent = `step ${S.at} / ${S.frames.length - 1}`;
+  $('bBack').disabled = S.at === 0;
+  $('bStep').disabled = S.at === S.frames.length - 1 && !(OPS[S.op].changes);
+  $('bStep').innerHTML = S.at === S.frames.length - 1 && OPS[S.op].changes ? 'Keep result <kbd>&rarr;</kbd>' : 'Step <kbd>&rarr;</kbd>';
+}
+
+// ---- control -----------------------------------------------------------------------------
+function rebuild() {
+  stop();
+  S.frames = trace(S.op, S.tree, S.value);
+  S.at = 0; S.answered = {};
+  renderCode(); render();
+}
+function step() {
+  if (S.at >= S.frames.length - 1) {
+    if (OPS[S.op].changes) { S.tree = copyTree(S.frames[S.at].tree); rebuild(); $('narr').innerHTML = 'The result is now the tree. Pick the next operation, or press <b>Step</b> to run this one again.'; }
+    return;
+  }
+  const f = S.frames[S.at];
+  if (S.quiz && f.q && !S.timer) { const st = S.answered[S.at]; if (!st || st.picked === undefined) return; }
+  S.at++; render();
+}
+function back() { if (S.at > 0) { S.at--; render(); } }
+function stop() { if (S.timer) { clearInterval(S.timer); S.timer = null; } $('bPlay').innerHTML = 'Play <kbd>P</kbd>'; }
+function play() {
+  if (S.timer) return stop();
+  if (S.at >= S.frames.length - 1) S.at = 0;
+  S.timer = setInterval(() => { if (S.at >= S.frames.length - 1) return stop(); S.at++; render(); }, 1100 - 100 * +$('speed').value);
+  $('bPlay').innerHTML = 'Pause <kbd>P</kbd>';
+}
+function loadPreset() {
+  const p = PRESETS.find(x => x.id === S.preset) || PRESETS[0];
+  S.tree = p.broken ? brokenTree() : buildTree(p.values);
+}
+function parseValue() {
+  const v = Number($('val').value.trim());
+  if (!Number.isInteger(v)) { $('narr').innerHTML = 'Type a whole number in the value box, for example <b>7</b>.'; return null; }
+  return v;
+}
+function runOp() {
+  if (OPS[S.op].needs) { const v = parseValue(); if (v === null) return; S.value = v; }
+  rebuild();
+}
+function buildCustom() {
+  const raw = $('custom').value.trim(); if (!raw) return;
+  const vs = raw.split(/[\s,\[\]]+/).filter(Boolean).map(Number);
+  if (!vs.length || vs.some(v => !Number.isInteger(v))) { $('narr').innerHTML = 'Type whole numbers, for example <b>50, 30, 70</b>.'; return; }
+  if (vs.length > 24) { $('narr').innerHTML = 'At most <b>24</b> values, so that the tree stays readable.'; return; }
+  S.tree = buildTree(vs); rebuild();
+}
+function save(k, v) { try { localStorage.setItem('tree-lab-' + k, v); } catch (e) {} }
+function load(k) { try { return localStorage.getItem('tree-lab-' + k); } catch (e) { return null; } }
+function setTheme(t) { if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); save('theme', t || ''); }
+function toggleQuiz() {
+  S.quiz = !S.quiz; S.answered = {};
+  $('bQuiz').classList.toggle('on', S.quiz);
+  $('bQuiz').innerHTML = `What happens next? ${S.quiz ? 'on' : 'off'} <kbd>Q</kbd>`;
+  render();
+}
+function toggleFs() { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }
+
+function init() {
+  $('preset').innerHTML = PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+  $('op').innerHTML = Object.entries(OPS).map(([id, o]) => `<option value="${id}">${o.label}</option>`).join('');
+  $('preset').onchange = () => { S.preset = $('preset').value; loadPreset(); rebuild(); };
+  $('op').onchange = () => { S.op = $('op').value; S.bug = S.bug && !!OPS[S.op].bug; $('bugBtn').classList.toggle('on', S.bug); save('op', S.op); runOp(); };
+  $('runBtn').onclick = runOp;
+  $('val').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); runOp(); } });
+  $('buildBtn').onclick = buildCustom;
+  $('custom').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); buildCustom(); } });
+  $('bugBtn').onclick = () => { if (!OPS[S.op].bug) return; S.bug = !S.bug; $('bugBtn').classList.toggle('on', S.bug); rebuild(); };
+  $('bStep').onclick = step; $('bBack').onclick = back; $('bPlay').onclick = play;
+  $('bRestart').onclick = () => { stop(); S.at = 0; S.answered = {}; render(); };
+  $('scrub').oninput = () => { stop(); S.at = +$('scrub').value; render(); };
+  $('bQuiz').onclick = toggleQuiz;
+  $('themeBtn').onclick = () => {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+      (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+    setTheme(dark ? 'light' : 'dark');
+  };
+  $('fsBtn').onclick = toggleFs;
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input[type=text], select') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (k === 'ArrowRight' || k === ' ') { e.preventDefault(); step(); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); back(); }
+    else if (k === 'r' || k === 'R') $('bRestart').click();
+    else if (k === 'p' || k === 'P') play();
+    else if (k === 'q' || k === 'Q') toggleQuiz();
+    else if (k === 'm' || k === 'M') $('bugBtn').click();
+    else if (k === 'f' || k === 'F') toggleFs();
+  });
+  const t = load('theme'); if (t) setTheme(t);
+  // A link can open one exact step: #tree=T&op=delete&value=3&mistake=1&at=12&quiz=1&theme=light
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (['light', 'dark'].includes(h.get('theme'))) setTheme(h.get('theme'));
+  if (PRESETS.some(p => p.id === h.get('tree'))) { S.preset = h.get('tree'); $('preset').value = S.preset; }
+  const op = OPS[h.get('op')] ? h.get('op') : (OPS[load('op')] ? load('op') : 'contains');
+  S.op = op; $('op').value = op;
+  if (h.get('value') !== null && Number.isInteger(Number(h.get('value')))) { S.value = Number(h.get('value')); }
+  $('val').value = S.value;
+  if (h.get('mistake') === '1' && OPS[op].bug) { S.bug = true; $('bugBtn').classList.add('on'); }
+  loadPreset(); rebuild();
+  const at = parseInt(h.get('at'), 10);
+  if (at > 0) { S.at = Math.min(at, S.frames.length - 1); render(); }
+  if (h.get('quiz') === '1') toggleQuiz();
+}
+
+/* Self-check: open the page as tree-lab.html#selftest. It checks the four
+   walks of T, search, insert, delete (all three cases, and the root), the
+   height, is_valid, each common mistake, and 200 random insert and delete
+   sequences against a sorted set. */
+function selftest() {
+  const lines = [], ok = (c, m) => lines.push((c ? 'PASS ' : 'FAIL ') + m);
+  const T0 = buildTree([8, 3, 10, 1, 6, 14, 4, 7, 13]);
+  const run = (op, tree, value, bug) => { const keep = S.bug; S.bug = !!bug; const fr = trace(op, tree, value); S.bug = keep; return fr[fr.length - 1]; };
+  ok(run('in_order', T0).result === '[1, 3, 4, 6, 7, 8, 10, 13, 14]', 'in-order of T is sorted');
+  ok(run('pre_order', T0).result === '[8, 3, 1, 6, 4, 7, 10, 14, 13]', 'pre-order of T');
+  ok(run('post_order', T0).result === '[1, 4, 7, 6, 3, 13, 14, 10, 8]', 'post-order of T');
+  ok(run('level_order', T0).result === '[8, 3, 10, 1, 6, 14, 4, 7, 13]', 'level-order of T');
+  let f = run('contains', T0, 7); ok(f.result === 'True' && f.cnt.visits === 4, `contains(7): True after visiting ${f.cnt.visits} nodes (4)`);
+  f = run('contains', T0, 5); ok(f.result === 'False' && f.path.length === 4, 'contains(5): False, path 8, 3, 6, 4');
+  f = run('insert', T0, 5); ok(validBST(f.tree) && inorderValues(f.tree).join() === '1,3,4,5,6,7,8,10,13,14', 'insert(5): 5 becomes a leaf, still a BST');
+  ok(run('height', T0).result === '3' && run('height', buildTree([1, 2, 3, 4, 5, 6, 7])).result === '6', 'height: T is 3, the chain 1..7 is 6');
+  ok(run('min', T0).result === '1' && run('max', T0).result === '14', 'min 1, max 14');
+  for (const [v, desc] of [[1, 'a leaf'], [14, 'one child'], [3, 'two children'], [8, 'the root']]) {
+    f = run('delete', T0, v); const want = [1, 3, 4, 6, 7, 8, 10, 13, 14].filter(x => x !== v).join();
+    ok(validBST(f.tree) && inorderValues(f.tree).join() === want, `delete(${v}), ${desc}: still a BST without ${v}`);
+  }
+  ok(run('is_valid', T0).result === 'True' && run('is_valid', brokenTree()).result === 'False', 'is_valid: T True, the broken tree False');
+  ok(run('is_valid', brokenTree(), null, true).result === 'True', 'is_valid mistake: the broken tree passes (wrongly)');
+  ok(run('height', T0, null, true).result === '4', 'height mistake: T comes out as 4');
+  ok(run('insert', T0, 5, true).lost === true && inorderValues(run('insert', T0, 5, true).tree).length === 9, 'insert mistake: the tree does not change');
+  ok(!validBST(run('delete', T0, 8, true).tree), 'delete mistake: delete(8) breaks the tree');
+  ok(run('contains', T0, 7, true).result === 'False', 'contains mistake: 7 is not found');
+  ok(run('level_order', T0, null, true).result !== '[8, 3, 10, 1, 6, 14, 4, 7, 13]', 'level-order mistake (a stack): not level by level');
+  let bad = 0;
+  for (let k = 0; k < 200; k++) {
+    let tree = emptyTree(); const set = new Set();
+    for (let s = 0; s < 25; s++) {
+      const v = Math.floor(Math.random() * 30);
+      if (Math.random() < 0.65) { tree = run('insert', tree, v).tree; set.add(v); } else { tree = run('delete', tree, v).tree; set.delete(v); }
+    }
+    const want = [...set].sort((a, b) => a - b).join();
+    if (inorderValues(tree).join() !== want || !validBST(tree) || run('contains', tree, 7).result !== (set.has(7) ? 'True' : 'False')) bad++;
+  }
+  ok(bad === 0, `200 random insert/delete sequences agree with a sorted set (${bad} failures)`);
+  const pre = $('selftest'); pre.hidden = false; pre.textContent = lines.join('\n');
+  document.title = (lines.every(l => l.startsWith('PASS')) ? 'PASS' : 'FAIL') + ' — Tree Lab';
+}
+
+init();
+if (location.hash === '#selftest') selftest();
+</script>
+</body>
+</html>

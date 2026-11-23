@@ -29,6 +29,7 @@ Faculty of Computers and Information Sciences, Mansoura University — Fall 2026
 | **[Lecture 09 — Basic Sorting](lectures/09-sorting-basic/lecture.md)** | Bubble, selection and insertion sort as generators you can animate; counting sort and the n log n lower bound. |
 | **[Lecture 10 — Advanced Sorting](lectures/10-sorting-advanced/lecture.md)** | Merge sort, quicksort and its pivots, heap sort — and the worst case measured. |
 | **[Lecture 11 — Trees](lectures/11-trees/lecture.md)** | Binary search trees, the three-case delete, the four traversals, and height measured. |
+| **[Tree Lab](https://helghareeb.github.io/DSA27/lectures/11-trees/tree-lab.html)** | Interactive: insert, search and delete in a binary search tree line by line — the path, the parent, the in-order successor — walk it in all four orders with the call stack and the queue, build the sorted chain and watch the height, answer *what happens next?*, and run each operation's common mistake. Offline: open `lectures/11-trees/tree-lab.html`. |
 | **[Lecture 12 — Heaps and Priority Queues](lectures/12-heaps/lecture.md)** | The array is the tree: sift-up, sift-down, build-heap in O(n), priority queues. |
 | **[Lecture 13 — Hash Tables](lectures/13-hash-tables/lecture.md)** | Hashing, chaining against open addressing, tombstones, load factor and resizing. |
 | **[Lecture 14 — Graphs and Graph Searches](lectures/14-graphs/lecture.md)** | Adjacency list against matrix, BFS and DFS, components, cycles, topological sort. |
