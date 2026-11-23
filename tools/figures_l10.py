@@ -42,9 +42,8 @@ PURPLE = "#7A5195"
 PIVOT = "#E3D3EE"
 GREY = "#D6D6D6"
 
-M = [38, 27, 43, 3, 9, 82, 10, 19]          # the merge-sort example
-Q = [6, 3, 9, 1, 8, 2, 7, 4]                # the quicksort example
-H = [4, 10, 3, 5, 1, 8, 2, 7]               # the heap-sort example
+L = [7, 2, 9, 4, 1, 8, 3, 6]                # one list for the whole lecture
+M = Q = H = L                               # the merge, quick and heap examples
 CARDS = [(3, "a"), (1, "b"), (3, "c"), (2, "d"), (1, "e"), (2, "f")]
 
 
@@ -155,18 +154,22 @@ def figure_divide(sorting):
 
 
 def figure_merge_step():
-    """One moment inside _merge(a, 0, 4, 8, scratch): four values already taken."""
-    a = [3, 27, 38, 43, 9, 10, 19, 82]
-    scratch = [3, 9, 10, 19, "", "", "", ""]
-    i, j, k = 1, 7, 4
+    """One moment inside the last _merge(a, 0, 4, 8, scratch) of merge_sort(M)."""
+    left, right = sorted(M[:4]), sorted(M[4:])
+    a = left + right
+    i, j, out = 0, 4, []
+    while len(out) < 4:                          # four values already taken
+        if a[i] <= a[j]:
+            out.append(a[i]); i += 1
+        else:
+            out.append(a[j]); j += 1
+    k = 4
+    scratch = out + [""] * 4
+    take_left = a[i] <= a[j]
     fig, ax = plt.subplots(figsize=(10.4, 3.7))
     w, h = 0.8, 0.55
-    fills = []
-    for idx in range(8):
-        if idx < 4:
-            fills.append(GREY if idx < i else FILL)
-        else:
-            fills.append(GREY if idx < j else HILITE)
+    fills = [GREY if (idx < i if idx < 4 else idx < j) else (FILL if idx < 4 else HILITE)
+             for idx in range(8)]
     row(ax, 1.6, a, fills, w=w, h=h, fontsize=11)
     row(ax, 0, scratch, [DONE] * 4 + ["white"] * 4, w=w, h=h, fontsize=11)
     ax.text(-0.25, 1.6 + h / 2, "a", ha="right", va="center", fontsize=11,
@@ -182,9 +185,11 @@ def figure_merge_step():
         ax.annotate(name, xy=(x, y0 - 0.2), xytext=(x, y0 - 0.62), ha="center",
                     fontsize=11, fontweight="bold", color=col,
                     arrowprops=dict(arrowstyle="-|>", color=col, lw=1.3))
+    move = (f"a[i] = {a[i]}  <=  a[j] = {a[j]}\n→ scratch[k] = {a[i]};  i += 1;  k += 1"
+            if take_left else
+            f"a[i] = {a[i]}  >  a[j] = {a[j]}\n→ scratch[k] = {a[j]};  j += 1;  k += 1")
     ax.text(8 * w + 0.5, 1.2,
-            "a[i] = 27  <=  a[j] = 82\n→ scratch[k] = 27;  i += 1;  k += 1\n\n"
-            "on a tie, take from the LEFT:\nthat one  <=  makes merge sort stable\n\n"
+            move + "\n\non a tie, take from the LEFT:\nthat one  <=  makes merge sort stable\n\n"
             "grey = already copied to scratch",
             va="center", fontsize=9.8, color=SLATE)
     clean(ax, (-1.4, 8 * w + 5.2), (-0.8, 2.75))
@@ -235,14 +240,14 @@ def figure_partition(sorting):
     lo, hi = 0, len(Q) - 1
     pivot = a[hi]
     boundary = lo
-    rows = [(list(a), boundary, lo, "start: pivot = a[hi] = 4")]
+    rows = [(list(a), boundary, lo, f"start: pivot = a[hi] = {pivot}")]
     for j in range(lo, hi):
         if a[j] < pivot:
-            note = f"j={j}: {a[j]} < 4 → swap a[{boundary}], a[{j}]; boundary={boundary + 1}"
+            note = f"j={j}: {a[j]} < {pivot} → swap a[{boundary}], a[{j}]; boundary={boundary + 1}"
             a[boundary], a[j] = a[j], a[boundary]
             boundary += 1
         else:
-            note = f"j={j}: {a[j]} ≥ 4 → leave it"
+            note = f"j={j}: {a[j]} ≥ {pivot} → leave it"
         rows.append((list(a), boundary, j + 1, note))
     a[boundary], a[hi] = a[hi], a[boundary]
     rows.append((list(a), boundary, hi, f"swap the pivot into a[{boundary}]: done"))
