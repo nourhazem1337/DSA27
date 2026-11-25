@@ -903,7 +903,8 @@ function renderTree(f) {
     let lbl = '';
     if (h.par === n && S.op === 'delete') lbl = 'parent';
     if (h.succ === n) lbl = 'successor';
-    svg += `<g class="${cls}"><circle cx="${x}" cy="${y}" r="19"/><text x="${x}" y="${y}">${v}</text>${lbl ? `<text class="lbl" x="${x}" y="${y + 31}">${lbl}</text>` : ''}</g>`;
+    const s = String(v), shown = s.length > 7 ? s.slice(0, 6) + '\u2026' : s;
+    svg += `<g class="${cls}"><circle cx="${x}" cy="${y}" r="19"><title>${s}</title></circle><text x="${x}" y="${y}"${s.length > 3 ? ` style="font-size:${s.length > 5 ? 8 : 11}px"` : ''}>${shown}</text>${lbl ? `<text class="lbl" x="${x}" y="${y + 31}">${lbl}</text>` : ''}</g>`;
   }
   $('pic').innerHTML = svg + '</svg>';
 }
@@ -994,21 +995,33 @@ function loadPreset() {
   const p = PRESETS.find(x => x.id === S.preset) || PRESETS[0];
   S.tree = p.broken ? brokenTree() : buildTree(p.values);
 }
+// Accept only whole numbers written in decimal, each exactly representable.
+// Number() alone would accept 1e3, 0x10 and 7.0, and would silently round
+// 9007199254740993 to 9007199254740992.
+function parseList(raw, most) {
+  const parts = raw.split(/[\s,\[\]]+/).filter(Boolean);
+  if (!parts.length || parts.some(part => !/^[+-]?\d+$/.test(part))) return { error: 'Type whole numbers in decimal, for example <b>50, -30, 70</b>.' };
+  if (parts.length > most) return { error: `At most <b>${most}</b> values, so that the tree stays readable.` };
+  const values = parts.map(Number);
+  if (values.some(v => !Number.isSafeInteger(v))) return { error: 'Use whole numbers from <b>-9007199254740991</b> to <b>9007199254740991</b> so each value is represented exactly.' };
+  return { values };
+}
 function parseValue() {
-  const v = Number($('val').value.trim());
-  if (!Number.isInteger(v)) { $('narr').innerHTML = 'Type a whole number in the value box, for example <b>7</b>.'; return null; }
-  return v;
+  const r = parseList($('val').value.trim(), 1);
+  if (r.error) { $('narr').innerHTML = r.error.replace('numbers', 'number').replace('50, -30, 70', '7'); return null; }
+  return r.values[0];
 }
 function runOp() {
+  stop();
   if (OPS[S.op].needs) { const v = parseValue(); if (v === null) return; S.value = v; }
   rebuild();
 }
 function buildCustom() {
   const raw = $('custom').value.trim(); if (!raw) return;
-  const vs = raw.split(/[\s,\[\]]+/).filter(Boolean).map(Number);
-  if (!vs.length || vs.some(v => !Number.isInteger(v))) { $('narr').innerHTML = 'Type whole numbers, for example <b>50, 30, 70</b>.'; return; }
-  if (vs.length > 24) { $('narr').innerHTML = 'At most <b>24</b> values, so that the tree stays readable.'; return; }
-  S.tree = buildTree(vs); rebuild();
+  stop();
+  const r = parseList(raw, 24);
+  if (r.error) { $('narr').innerHTML = r.error; return; }
+  S.tree = buildTree(r.values); rebuild();
 }
 function save(k, v) { try { localStorage.setItem('tree-lab-' + k, v); } catch (e) {} }
 function load(k) { try { return localStorage.getItem('tree-lab-' + k); } catch (e) { return null; } }
@@ -1059,7 +1072,7 @@ function init() {
   if (PRESETS.some(p => p.id === h.get('tree'))) { S.preset = h.get('tree'); $('preset').value = S.preset; }
   const op = OPS[h.get('op')] ? h.get('op') : (OPS[load('op')] ? load('op') : 'contains');
   S.op = op; $('op').value = op;
-  if (h.get('value') !== null && Number.isInteger(Number(h.get('value')))) { S.value = Number(h.get('value')); }
+  if (h.get('value') !== null) { const r = parseList(h.get('value'), 1); if (r.values) S.value = r.values[0]; }
   $('val').value = S.value;
   if (h.get('mistake') === '1' && OPS[op].bug) { S.bug = true; $('bugBtn').classList.add('on'); }
   loadPreset(); rebuild();
@@ -1107,6 +1120,12 @@ function selftest() {
     if (inorderValues(tree).join() !== want || !validBST(tree) || run('contains', tree, 7).result !== (set.has(7) ? 'True' : 'False')) bad++;
   }
   ok(bad === 0, `200 random insert/delete sequences agree with a sorted set (${bad} failures)`);
+  const neg = buildTree([0, -5, 5, -10, -1, 3]);
+  ok(run('in_order', neg).result === '[-10, -5, -1, 0, 3, 5]' && validBST(run('delete', neg, -5).tree), 'negative values: in-order sorted, delete keeps a BST');
+  const big = parseList('9007199254740993, 9007199254740992', 24);
+  ok(!!big.error && /9007199254740991/.test(big.error), 'input: 9007199254740993 is refused, and the message gives the limit');
+  ok(['1e3', '0x10', '7.0', '1,,2a'].every(x => !!parseList(x, 24).error), 'input: 1e3, 0x10, 7.0 and 2a are refused');
+  ok(parseList('[-1, -5, 0, +2]', 24).values.join() === '-1,-5,0,2' && !!parseList('1, 2', 1).error, 'input: [-1, -5, 0, +2] is accepted; the value box takes one number');
   const pre = $('selftest'); pre.hidden = false; pre.textContent = lines.join('\n');
   document.title = (lines.every(l => l.startsWith('PASS')) ? 'PASS' : 'FAIL') + ' — Tree Lab';
 }
