@@ -124,6 +124,13 @@ main { display: grid; gap: 12px; padding: 12px; min-height: 0;
   transition: height .18s ease, background-color .18s; display: flex; align-items: flex-start; justify-content: center; }
 .val { font: 700 13px var(--f-code); margin-bottom: 3px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .idx { font: 11px var(--f-code); color: var(--muted); margin-top: 4px; }
+.bars.signed { position: relative; }
+.bars.signed::before { content: ''; position: absolute; inset: 50% 0 auto; border-top: 1px solid var(--muted); }
+.signed .col { position: relative; }
+.signed .val { position: absolute; top: 0; }
+.signed .bar { position: absolute; bottom: 50%; }
+.signed .bar.negative { top: 50%; bottom: auto; border-radius: 2px 2px 6px 6px; }
+.signed .bar.zero { height: 2px; border: 0; }
 .card { width: 100%; height: 76px; border-radius: 8px; border: 2px solid var(--line); background: var(--panel-2);
   display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .card .key { font: 700 22px var(--f-code); }
@@ -722,11 +729,18 @@ function ptrs(f, i) {
 }
 function renderBars(f) {
   const cards = S.items.some(x => x.tag);
-  const maxK = Math.max(1, ...S.items.map(x => x.k));
-  return `<div class="bars">${f.a.map((x, i) => {
+  const signed = S.items.some(x => x.k < 0);
+  const maxK = Math.max(1, ...S.items.map(x => Math.abs(x.k)));
+  return `<div class="bars${signed ? ' signed' : ''}">${f.a.map((x, i) => {
     const cls = colClass(f, i), p = ptrs(f, i);
+    let bar;
+    if (signed && x.k === 0) bar = '<div class="bar zero"></div>';
+    else {
+      const height = signed ? 35 * Math.abs(x.k) / maxK : 8 + 66 * x.k / maxK;
+      bar = `<div class="bar${x.k < 0 ? ' negative' : ''}" style="height:${height}%"></div>`;
+    }
     const body = cards ? `<div class="card"><span class="key">${x.k}</span><span class="nm">${x.tag}</span></div>`
-      : `<div class="val">${x.t}</div><div class="bar" style="height:${8 + 66 * Math.max(0, x.k) / maxK}%"></div>`;
+      : `<div class="val" title="${x.t}">${x.t}</div>${bar}`;
     return `<div class="col ${cls}">${body}<div class="idx">${i}</div><div class="ptr">${p}</div></div>`;
   }).join('')}</div>`;
 }
@@ -743,7 +757,7 @@ function renderTree(f) {
   const cmp = new Set((f.hi && f.hi.cmp) || []);
   for (let i = 0; i < n; i++) {
     const cls = all || i >= size ? 'final' + (all ? '' : ' gone') : cmp.has(i) ? 'cmp' : '';
-    svg += `<g class="${cls}"><circle cx="${pos[i][0]}" cy="${pos[i][1]}" r="15"/><text x="${pos[i][0]}" y="${pos[i][1]}">${f.a[i].k}</text><text class="ix" x="${pos[i][0] + 21}" y="${pos[i][1] - 11}">${i}</text></g>`;
+    svg += `<g class="${cls}"><circle cx="${pos[i][0]}" cy="${pos[i][1]}" r="15"><title>${f.a[i].k}</title></circle><text x="${pos[i][0]}" y="${pos[i][1]}"${String(f.a[i].k).length > 3 ? ' style="font-size:8px"' : ''}>${String(f.a[i].k).length > 6 ? String(f.a[i].k).slice(0, 5) + '…' : f.a[i].k}</text><text class="ix" x="${pos[i][0] + 21}" y="${pos[i][1] - 11}">${i}</text></g>`;
   }
   return svg + '</svg>';
 }
@@ -764,6 +778,7 @@ function renderPic(f) {
     quick: [sw('prefix-bg', 'line', '&lt; pivot'), sw('accent-bg', 'line', '≥ pivot'), sw('pivot-bg', 'pivot', 'the pivot'), sw('accent-bg', 'accent', 'a[j]'), sw('done-bg', 'done', 'final place'), '<span>b: boundary</span>'],
     heap: [sw('accent-bg', 'accent', 'being compared'), sw('done-bg', 'done', 'sorted, final'), '<span>the tree and the bars are the same list</span>'],
   }[S.algo];
+  if (S.items.some(x => x.k < 0)) leg.push('<span>Negative bars extend below the zero line</span>');
   $('legend').innerHTML = leg.join('');
 }
 function renderVars(f) {
@@ -839,12 +854,23 @@ function loadInput() {
   const p = PRESETS.find(x => x.id === S.preset) || PRESETS[0];
   S.items = p.cards ? itemsFromCards(p.cards) : itemsFromValues(p.values || randomValues(8));
 }
+// Accept only whole numbers written in decimal, each exactly representable.
+// Number() alone would accept 1e3, 0x10 and 7.0, and would silently round
+// 9007199254740993 to 9007199254740992.
+function parseList(raw) {
+  const parts = raw.split(/[\s,\[\]]+/).filter(Boolean);
+  if (!parts.length || parts.some(part => !/^[+-]?\d+$/.test(part))) return { error: 'Type whole numbers in decimal, for example <b>7, -2, 0, 4</b>.' };
+  if (parts.length > 16) return { error: 'At most <b>16</b> values, so that the picture stays readable.' };
+  const values = parts.map(Number);
+  if (values.some(v => !Number.isSafeInteger(v))) return { error: 'Use whole numbers from <b>-9007199254740991</b> to <b>9007199254740991</b> so each value is represented exactly.' };
+  return { values };
+}
 function runCustom() {
   const raw = $('custom').value.trim(); if (!raw) return;
-  const vs = raw.split(/[\s,\[\]]+/).filter(Boolean).map(Number);
-  if (!vs.length || vs.some(v => !Number.isInteger(v))) { $('narr').innerHTML = 'Type whole numbers, for example <b>7, 2, 9, 4</b>.'; return; }
-  if (vs.length > 16) { $('narr').innerHTML = 'At most <b>16</b> values, so that the picture stays readable.'; return; }
-  S.items = itemsFromValues(vs); rebuild();
+  stop();
+  const r = parseList(raw);
+  if (r.error) { $('narr').innerHTML = r.error; return; }
+  S.items = itemsFromValues(r.values); rebuild();
 }
 function save(k, v) { try { localStorage.setItem('fast-sorting-lab-' + k, v); } catch (e) {} }
 function load(k) { try { return localStorage.getItem('fast-sorting-lab-' + k); } catch (e) { return null; } }
@@ -889,6 +915,7 @@ function init() {
   });
   const t = load('theme'); if (t) setTheme(t);
   // A link can open one exact step: #algo=quick&input=sorted16&pivot=first&mistake=1&at=40&quiz=1&theme=light
+  // or your own list: #algo=heap&list=-1,-5,0,2
   const h = new URLSearchParams(location.hash.slice(1));
   if (['light', 'dark'].includes(h.get('theme'))) setTheme(h.get('theme'));
   if (PRESETS.some(p => p.id === h.get('input'))) { S.preset = h.get('input'); $('preset').value = S.preset; }
@@ -896,6 +923,7 @@ function init() {
   if (h.get('mistake') === '1') { S.bug = true; $('bugBtn').classList.add('on'); }
   const a = ALGOS[h.get('algo')] ? h.get('algo') : load('algo');
   setAlgo(ALGOS[a] ? a : 'merge');
+  if (h.get('list')) { const r = parseList(h.get('list')); if (r.values) { S.items = itemsFromValues(r.values); rebuild(); } else $('narr').innerHTML = r.error; }
   const at = parseInt(h.get('at'), 10);
   if (at > 0) { S.at = Math.min(at, S.frames.length - 1); render(); }
   if (h.get('quiz') === '1') toggleQuiz();
@@ -932,6 +960,24 @@ function selftest() {
     for (const pv of ['last', 'first', 'median3', 'random']) if (keys(last('quick', itemsFromValues(vs), false, pv)) !== want) bad++;
   }
   ok(bad === 0, `300 random lists x 6 runs agree with the built-in sort (${bad} failures)`);
+  let badNeg = 0;
+  for (let t = 0; t < 100; t++) {
+    const vs = Array.from({ length: 1 + Math.floor(Math.random() * 12) }, () => Math.floor(Math.random() * 21) - 10);
+    const want = vs.slice().sort((x, y) => x - y).join(',');
+    for (const algo of ['merge', 'heap']) if (keys(last(algo, itemsFromValues(vs))) !== want) badNeg++;
+    for (const pv of ['last', 'first', 'median3', 'random']) if (keys(last('quick', itemsFromValues(vs), false, pv)) !== want) badNeg++;
+  }
+  ok(badNeg === 0, `100 lists with negative values x 6 runs sort correctly (${badNeg} failures)`);
+  const keepItems = S.items; S.items = itemsFromValues([-1, -5, 0, 2]);
+  const html = renderBars(trace('merge', S.items)[0]); S.items = keepItems;
+  const heights = [...html.matchAll(/height:([\d.]+)%/g)].map(m => +m[1]);
+  ok(html.includes('signed') && (html.match(/bar negative/g) || []).length === 2 && html.includes('bar zero') && heights[0] !== heights[1],
+    `signed bars for [-1, -5, 0, 2]: two below the line, one zero line, heights ${heights.join(' / ')}`);
+  const bad1 = parseList('9007199254740993, 9007199254740992'), bad2 = ['1e3', '0x10', '7.0', '1,,2a'].map(parseList);
+  const good = parseList('[-1, -5, 0, +2]');
+  ok(!!bad1.error && /9007199254740991/.test(bad1.error), 'input: 9007199254740993 is refused, and the message gives the limit');
+  ok(bad2.every(r => !!r.error), 'input: 1e3, 0x10, 7.0 and 2a are refused');
+  ok(good.values && good.values.join() === '-1,-5,0,2', 'input: [-1, -5, 0, +2] is accepted');
   const pre = $('selftest'); pre.hidden = false; pre.textContent = lines.join('\n');
   document.title = (lines.every(l => l.startsWith('PASS')) ? 'PASS' : 'FAIL') + ' — Fast Sorting Lab';
 }
